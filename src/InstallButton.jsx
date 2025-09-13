@@ -45,7 +45,7 @@ function InstallButton() {
   return (
     <div style={{
         position: 'fixed',
-        top: '20px',
+        top: '120px',
         left: '50%',
         transform: 'translateX(-50%)',
         zIndex: 1000
