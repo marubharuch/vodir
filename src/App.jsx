@@ -8,6 +8,7 @@ import InstallButton from './InstallButton';
 import BottomNav from './components/BottomNav';
 import HousieUser from './housie/HousieUser';
 import HousieAdmin from './housie/HousieAdmin';
+import FamilyPage from './pages/FamilyPage';
 function App() {
   return (
     <div>
@@ -18,6 +19,8 @@ function App() {
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/housie" element={<HousieUser />} />
         <Route path="/housieadmin" element={<HousieAdmin />} />
+        <Route path="/family" element={<FamilyPage />} /> {/* ✅ added */}
+    
         
         
         

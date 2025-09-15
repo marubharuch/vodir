@@ -3,6 +3,7 @@ import React from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 import { FaWhatsapp, FaArrowRight } from 'react-icons/fa';
+import { Link } from "react-router-dom";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
@@ -32,10 +33,13 @@ const Carousel = ({ images }) => {
                   className="flex items-center bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg text-sm">
                   <FaWhatsapp className="mr-2" /> WhatsApp
                 </a>
-                <a href={slide.readMoreLink}
-                  className="flex items-center bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-lg text-sm">
-                  Read More <FaArrowRight className="ml-2" />
-                </a>
+             
+<Link
+  to={slide.readMoreLink}
+  className="flex items-center bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-lg text-sm"
+>
+  Read More <FaArrowRight className="ml-2" />
+</Link>
               </div>
             </div>
           </div>

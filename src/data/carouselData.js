@@ -4,10 +4,10 @@
 export const  images = [
     {
       image: "https://picsum.photos/800/400?random=1",
-      title: "Beautiful Hills",
+      title: "વિસા ઓસવાળ -બરોડા સમાજ",
       description: "Explore the scenic landscapes of the hills.",
       whatsappLink: "https://wa.me/1234567890",
-      readMoreLink: "/read-more-1"
+      readMoreLink: "/family"
     },
     {
       image: "https://picsum.photos/800/400?random=2",

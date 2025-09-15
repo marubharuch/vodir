@@ -17,10 +17,12 @@ const BottomNav = () => {
         <FaCommentDots size={24} />
         <span className="text-xs">Admin</span>
       </Link>
-      <button className="flex flex-col items-center text-gray-700 hover:text-gray-500">
+      <Link to="/family" className="flex flex-col items-center text-gray-700 hover:text-gray-500">
         <FaSearch size={24} />
-        <span className="text-xs">Search</span>
-      </button>
+        <span className="text-xs">Families</span>
+      </Link>
+
+
     </div>
   );
 };
