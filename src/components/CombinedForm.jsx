@@ -25,7 +25,7 @@ const CombinedForm = () => {
   // 👉 Add or Update Member
   const handleAdd = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
-      setWarning("⚠️ Please fill both Native City and Current City.");
+      setWarning("⚠️ Please fill all fields  Native, City, etc and select M or F.");
       return;
     }
     if (!canAdd) {
@@ -77,7 +77,7 @@ const CombinedForm = () => {
   // 👉 Finish form
   const handleFinish = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
-      setWarning("⚠️ Please fill both Native City and Current City.");
+      setWarning("⚠️ Please fill all data Native, City etc");
       return;
     }
 
@@ -186,7 +186,7 @@ const CombinedForm = () => {
     <option value="">M/F</option>
     <option value="Male">Male</option>
     <option value="Female">Female</option>
-    
+
   </select>
 
   <input
