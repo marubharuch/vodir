@@ -1,18 +1,23 @@
-// src/App.jsx
-import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegistrationPage from './pages/RegistrationPage';
-import InstallButton from './InstallButton';
-import BottomNav from './components/BottomNav';
-import HousieUser from './housie/HousieUser';
-import HousieAdmin from './housie/HousieAdmin';
-import FamilyPage from './pages/FamilyPage';
-import CombinedForm from './components/CombinedForm';
+import { Routes, Route, Navigate } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegistrationPage from "./pages/RegistrationPage";
+import InstallButton from "./InstallButton";
+import BottomNav from "./components/BottomNav";
+import HousieUser from "./housie/HousieUser";
+import HousieAdmin from "./housie/HousieAdmin";
+import FamilyPage from "./pages/FamilyPage";
+import CombinedForm from "./components/CombinedForm";
 
-import { AuthProvider } from './context/AuthContext'     // ✅ new
-import { ProfileProvider } from './context/ProfileContext'; // ✅ new
+import { AuthProvider, useAuth } from "./context/AuthContext"; // ✅ useAuth hook
+import { ProfileProvider } from "./context/ProfileContext";
+
+// ✅ Wrapper to protect routes
+const PrivateRoute = ({ children }) => {
+  const { user } = useAuth();
+  return user ? children : <Navigate to="/login" />;
+};
 
 function App() {
   return (
@@ -21,13 +26,53 @@ function App() {
         <div className="max-w-md mx-auto p-4 pb-24">
           <Navbar />
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            {/* ✅ Protect homepage */}
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <HomePage />
+                </PrivateRoute>
+              }
+            />
+
+            {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegistrationPage />} />
-            <Route path="/housie" element={<HousieUser />} />
-            <Route path="/housieadmin" element={<HousieAdmin />} />
-            <Route path="/family" element={<FamilyPage />} />
-            <Route path="/voice" element={<CombinedForm />} />
+
+            {/* Other routes (you can also protect them if needed) */}
+            <Route
+              path="/housie"
+              element={
+                <PrivateRoute>
+                  <HousieUser />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/housieadmin"
+              element={
+                <PrivateRoute>
+                  <HousieAdmin />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/family"
+              element={
+                <PrivateRoute>
+                  <FamilyPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/voice"
+              element={
+                <PrivateRoute>
+                  <CombinedForm />
+                </PrivateRoute>
+              }
+            />
           </Routes>
           <InstallButton />
           <BottomNav />

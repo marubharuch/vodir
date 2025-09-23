@@ -1,4 +1,4 @@
-// src/contexts/ProfileContext.jsx
+// src/context/ProfileContext.jsx
 import { createContext, useContext, useState, useEffect } from "react";
 import localforage from "localforage";
 

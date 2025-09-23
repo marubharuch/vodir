@@ -1,5 +1,7 @@
 // src/pages/RegistrationPage.jsx
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import localforage from 'localforage';
 
 const RegistrationPage = () => {
   const [formData, setFormData] = useState({
@@ -7,9 +9,9 @@ const RegistrationPage = () => {
     email: '',
     password: '',
   });
-
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const navigate = useNavigate();
 
   const handleChange = (e) => {
     setFormData(prev => ({
@@ -34,13 +36,29 @@ const RegistrationPage = () => {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     if (Object.keys(validationErrors).length === 0) {
-      console.log('Form data submitted:', formData);
-      setSubmitted(true);
-      // You can send formData to API or Firebase here
+      try {
+        // Check if user already exists
+        const savedUser = await localforage.getItem('authUser');
+        if (savedUser && savedUser.email === formData.email) {
+          alert('Email already registered! Redirecting to login page...');
+          navigate('/login');
+          return;
+        }
+
+        // Save new user to localforage
+        await localforage.setItem('authUser', formData);
+
+        setSubmitted(true);
+        alert('Registration successful! Redirecting to login...');
+        navigate('/login');
+      } catch (err) {
+        console.error('Registration failed:', err);
+        alert('Something went wrong. Please try again.');
+      }
     } else {
       setErrors(validationErrors);
     }

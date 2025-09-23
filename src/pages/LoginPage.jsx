@@ -1,14 +1,37 @@
 // src/pages/LoginPage.jsx
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
+import localforage from 'localforage';
 
 const LoginPage = () => {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(''); // optional for now
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    // TODO: Add Firebase login logic here
-    console.log('Logging in with:', email, password);
+
+    try {
+      // Try to find the user in localforage
+      const savedUser = await localforage.getItem('authUser');
+
+      if (!savedUser || savedUser.email !== email) {
+        // User not found → redirect to registration
+        alert('User not registered. Redirecting to registration page...');
+        navigate('/register');
+        return;
+      }
+
+      // User exists → log in
+      await login(savedUser);
+      console.log('User logged in:', savedUser);
+      navigate('/'); // go to homepage
+    } catch (err) {
+      console.error('Login failed:', err);
+      alert('Something went wrong. Please try again.');
+    }
   };
 
   return (
@@ -17,17 +40,22 @@ const LoginPage = () => {
         <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label htmlFor="email" className="block text-gray-700 text-sm font-bold mb-2">Email</label>
+            <label htmlFor="email" className="block text-gray-700 text-sm font-bold mb-2">
+              Email
+            </label>
             <input
               type="email"
               id="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
             />
           </div>
           <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+            <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
+              Password
+            </label>
             <input
               type="password"
               id="password"
@@ -45,6 +73,13 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
+
+        <p className="mt-4 text-center text-sm text-gray-600">
+          Not registered?{' '}
+          <Link to="/register" className="text-blue-500 hover:underline">
+            Sign up here
+          </Link>
+        </p>
       </div>
     </div>
   );
