@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useProfile } from "../context/ProfileContext"; // ✅ use profile context
 
 const CombinedForm = () => {
+  const { profile, updateProfile } = useProfile();
+
   const [members, setMembers] = useState([]);
   const [formData, setFormData] = useState({
     nativeCity: "",
@@ -16,6 +19,23 @@ const CombinedForm = () => {
   const [finalized, setFinalized] = useState(false);
   const [showForm, setShowForm] = useState(true);
 
+  // 👉 Load profile if available
+  useEffect(() => {
+    if (profile) {
+      setFormData((s) => ({
+        ...s,
+        nativeCity: profile.nativeCity || "",
+        currentCity: profile.currentCity || ""
+      }));
+      setMembers(profile.members || []);
+      if (profile.nativeCity && profile.currentCity) setCityLocked(true);
+      if (profile.members?.length > 0) {
+        setFinalized(true);
+        setShowForm(false);
+      }
+    }
+  }, [profile]);
+
   const canAdd =
     formData.gender &&
     formData.name.trim() &&
@@ -25,7 +45,7 @@ const CombinedForm = () => {
   // 👉 Add or Update Member
   const handleAdd = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
-      setWarning("⚠️ Please fill all fields  Native, City, etc and select M or F.");
+      setWarning("⚠️ Please fill Native & Current City first.");
       return;
     }
     if (!canAdd) {
@@ -35,7 +55,6 @@ const CombinedForm = () => {
     setWarning("");
 
     if (editingId) {
-      // Update existing member
       setMembers((prev) =>
         prev.map((m) =>
           m.id === editingId
@@ -51,7 +70,6 @@ const CombinedForm = () => {
       );
       setEditingId(null);
     } else {
-      // Add new member
       setMembers((prev) => [
         ...prev,
         {
@@ -74,10 +92,10 @@ const CombinedForm = () => {
     }));
   };
 
-  // 👉 Finish form
+  // 👉 Finish form → save to ProfileContext
   const handleFinish = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
-      setWarning("⚠️ Please fill all data Native, City etc");
+      setWarning("⚠️ Please fill all data (Native, Current City).");
       return;
     }
 
@@ -106,17 +124,17 @@ const CombinedForm = () => {
       members: updatedMembers
     };
 
-    localStorage.setItem("familyData", JSON.stringify(payload));
-    setMembers(updatedMembers);
+    // ✅ Save in ProfileContext (and localForage)
+    updateProfile(payload);
 
+    setMembers(updatedMembers);
     setCityLocked(true);
-    setFinalized(true);   // ✅ mark finished
-    setShowForm(false);   // ✅ hide form
+    setFinalized(true);
+    setShowForm(false);
     setEditingId(null);
     setWarning("");
   };
 
-  // 👉 Edit member (form ખોલે છે)
   const startEditMember = (id) => {
     const m = members.find((x) => x.id === id);
     if (!m) return;
@@ -131,9 +149,10 @@ const CombinedForm = () => {
     setShowForm(true);
   };
 
-  // 👉 Delete member
   const deleteMember = (id) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    const updated = members.filter((m) => m.id !== id);
+    setMembers(updated);
+    updateProfile({ ...profile, members: updated }); // ✅ persist delete
   };
 
   return (
@@ -178,32 +197,31 @@ const CombinedForm = () => {
         <div className="mt-3 border p-3 rounded">
           <h2 className="text-lg font-bold">📝 Member Form</h2>
           <div className="flex gap-2 my-2 w-full max-w-full">
-  <select
-    value={formData.gender}
-    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-    className="border p-1 w-1/5"
-  >
-    <option value="">M/F</option>
-    <option value="Male">Male</option>
-    <option value="Female">Female</option>
+            <select
+              value={formData.gender}
+              onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+              className="border p-1 w-1/5"
+            >
+              <option value="">M/F</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+            </select>
 
-  </select>
+            <input
+              type="text"
+              value={formData.countryCode}
+              onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
+              className="border p-1 w-16 flex-shrink-0"
+            />
 
-  <input
-    type="text"
-    value={formData.countryCode}
-    onChange={(e) => setFormData({ ...formData, countryCode: e.target.value })}
-    className="border p-1 w-16 flex-shrink-0"
-  />
-
-  <input
-    type="text"
-    placeholder="Mobile"
-    value={formData.mobile}
-    onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-    className="border p-1 flex-1 min-w-0"
-  />
-</div>
+            <input
+              type="text"
+              placeholder="Mobile"
+              value={formData.mobile}
+              onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+              className="border p-1 flex-1 min-w-0"
+            />
+          </div>
 
           <input
             type="text"
@@ -213,14 +231,19 @@ const CombinedForm = () => {
             className="border p-1 w-full my-2"
           />
 
-          <div className="flex gap-2">
-            <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-2 rounded">
-              {editingId ? "Update" : "Add"}
-            </button>
-            <button onClick={handleFinish} className="bg-blue-500 text-white px-3 py-2 rounded">
-              Finish
-            </button>
-          </div>
+<div className="flex gap-2">
+  <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-2 rounded">
+    {editingId ? "Update" : "Add"}
+  </button>
+
+  {/* 👇 Hide Finish if editing */}
+  {!editingId && (
+    <button onClick={handleFinish} className="bg-blue-500 text-white px-3 py-2 rounded">
+      Finish
+    </button>
+  )}
+</div>
+
         </div>
       )}
 

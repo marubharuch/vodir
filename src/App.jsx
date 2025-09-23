@@ -9,7 +9,7 @@ import HousieUser from "./housie/HousieUser";
 import HousieAdmin from "./housie/HousieAdmin";
 import FamilyPage from "./pages/FamilyPage";
 import CombinedForm from "./components/CombinedForm";
-
+import ProfilePage from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./context/AuthContext"; // ✅ useAuth hook
 import { ProfileProvider } from "./context/ProfileContext";
 
@@ -39,6 +39,15 @@ function App() {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegistrationPage />} />
+
+<Route
+  path="/profile"
+  element={
+    <PrivateRoute>
+      <ProfilePage />
+    </PrivateRoute>
+  }
+/>
 
             {/* Other routes (you can also protect them if needed) */}
             <Route

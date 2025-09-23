@@ -84,6 +84,7 @@ const Navbar = () => {
             <Link to="/" className="hover:text-gray-300" onClick={handleCloseMenu}>Home</Link>
             <Link to="/login" className="hover:text-gray-300" onClick={handleCloseMenu}>Login</Link>
             <Link to="/register" className="hover:text-gray-300" onClick={handleCloseMenu}>Register</Link>
+            <Link to="/profile" className="hover:text-gray-300"onClick={handleCloseMenu} >Profile</Link>
             <Link to="/boards" className="hover:text-gray-300" onClick={handleCloseMenu}>Boards</Link>
             <Link to="/matrimonial" className="hover:text-gray-300" onClick={handleCloseMenu}>Matrimonial</Link>
             <Link to="/developer-team" className="hover:text-gray-300" onClick={handleCloseMenu}>Developer Team</Link>
@@ -99,6 +100,7 @@ const Navbar = () => {
         <Link to="/" className="hover:text-gray-300">Home</Link>
         <Link to="/login" className="hover:text-gray-300">Login</Link>
         <Link to="/register" className="hover:text-gray-300">Register</Link>
+        <Link to="/profile" className="hover:text-gray-300">Profile</Link>
         <Link to="/boards" className="hover:text-gray-300">Boards</Link>
         <Link to="/matrimonial" className="hover:text-gray-300">Matrimonial</Link>
         <Link to="/developer-team" className="hover:text-gray-300">Developer Team</Link>

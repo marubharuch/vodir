@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import localforage from 'localforage';
+import { useAuth } from '../context/AuthContext'; // ✅ import auth
 
 const RegistrationPage = () => {
   const [formData, setFormData] = useState({
@@ -12,6 +13,7 @@ const RegistrationPage = () => {
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth(); // ✅ get login from context
 
   const handleChange = (e) => {
     setFormData(prev => ({
@@ -44,17 +46,21 @@ const RegistrationPage = () => {
         // Check if user already exists
         const savedUser = await localforage.getItem('authUser');
         if (savedUser && savedUser.email === formData.email) {
-          alert('Email already registered! Redirecting to login page...');
-          navigate('/login');
+          alert('Email already registered! Redirecting to profile...');
+          login(savedUser); // ✅ log them in anyway
+          navigate('/profile'); // ✅ go straight to profile
           return;
         }
 
         // Save new user to localforage
         await localforage.setItem('authUser', formData);
 
+        // ✅ Immediately log in new user
+        await login(formData);
+
         setSubmitted(true);
-        alert('Registration successful! Redirecting to login...');
-        navigate('/login');
+        alert('Registration successful! Redirecting to profile...');
+        navigate('/profile'); // ✅ redirect new user to profile
       } catch (err) {
         console.error('Registration failed:', err);
         alert('Something went wrong. Please try again.');
