@@ -1,12 +1,108 @@
-# React + Vite
+📘 Project Documentation
+🚀 Overview
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is a React + Vite + Tailwind project that uses React Context + localForage to handle:
 
-Currently, two official plugins are available:
+Authentication (login/logout)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+User Profile persistence
 
-## Expanding the ESLint configuration
+Protected routes
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+📂 Project Structure (Key Files)
+
+src/App.jsx
+
+Main app entry.
+
+Wraps everything with AuthProvider and ProfileProvider.
+
+Defines all routes using react-router-dom.
+
+Uses PrivateRoute to restrict access to authenticated users.
+
+Common UI: Navbar, BottomNav, InstallButton.
+
+src/context/AuthContext.jsx
+
+Manages authentication state.
+
+Saves and loads user data from localForage under key authUser.
+
+Exposes:
+
+user: logged-in user object (or null).
+
+login(userData): logs in + persists.
+
+logout(): clears login data.
+
+Provides useAuth() hook for easy access.
+
+src/context/ProfileContext.jsx
+
+Manages profile state (separate from auth).
+
+Saves/loads data from localForage under key profileData.
+
+Exposes:
+
+profile: current profile object.
+
+updateProfile(data): update + persist.
+
+Provides useProfile() hook.
+
+🛠️ Setup & Run
+
+Clone repository:
+
+git clone <repo-url>
+cd project-folder
+
+
+Install dependencies:
+
+npm install
+
+
+Start development server:
+
+npm run dev
+
+
+Build for production:
+
+npm run build
+
+🔑 Key Concepts
+
+Contexts
+
+AuthContext: Who is logged in.
+
+ProfileContext: Profile data (family/user info).
+
+Protected Routes
+
+PrivateRoute checks if user exists.
+
+Redirects to /login if not authenticated.
+
+Persistence
+
+Data stored in localForage (IndexedDB).
+
+Works offline and reloads with saved state.
+
+✅ Coding Guidelines
+
+Always use hooks (useAuth, useProfile) instead of accessing state directly.
+
+Use login() / logout() for authentication changes.
+
+Use updateProfile() for profile changes.
+
+Add new pages inside /pages/ and declare them in App.jsx.
+
+Wrap private routes with <PrivateRoute>.
