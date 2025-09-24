@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import { createContext, useContext, useState, useEffect } from "react";
 import localforage from "localforage";
 
@@ -13,12 +14,7 @@ export function AuthProvider({ children }) {
       .getItem("authUser")
       .then((savedUser) => {
         if (savedUser) {
-          // Optional: check expiry
-          // if (savedUser.expiresAt && savedUser.expiresAt < Date.now()) {
-          //   localforage.removeItem("authUser");
-          // } else {
           setUser(savedUser);
-          // }
         }
       })
       .catch((err) => {
@@ -29,11 +25,6 @@ export function AuthProvider({ children }) {
 
   // Login → save to state + localforage
   const login = async (userData) => {
-    // Optional expiry: 24h
-    // const dataWithExpiry = { ...userData, expiresAt: Date.now() + 24*60*60*1000 };
-    // setUser(dataWithExpiry);
-    // await localforage.setItem("authUser", dataWithExpiry);
-
     setUser(userData);
     await localforage.setItem("authUser", userData);
   };
@@ -44,7 +35,6 @@ export function AuthProvider({ children }) {
     await localforage.removeItem("authUser");
   };
 
-  // Show loading fallback until localforage check completes
   if (loading) {
     return <div className="text-center p-4">Loading...</div>;
   }

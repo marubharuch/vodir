@@ -1,8 +1,21 @@
+// src/components/CombinedForm.jsx
 import React, { useState, useEffect } from "react";
-import { useProfile } from "../context/ProfileContext"; // ✅ use profile context
+import { useProfile } from "../context/ProfileContext";
+import { datastore } from "../firebase";
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  getDocs,
+  query,
+  where
+} from "firebase/firestore";
+import { useAuth } from "../context/AuthContext";
 
 const CombinedForm = () => {
   const { profile, updateProfile } = useProfile();
+  const { user } = useAuth();
 
   const [members, setMembers] = useState([]);
   const [formData, setFormData] = useState({
@@ -13,6 +26,7 @@ const CombinedForm = () => {
     countryCode: "+91",
     mobile: ""
   });
+  const [joinPin, setJoinPin] = useState("");
   const [cityLocked, setCityLocked] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [warning, setWarning] = useState("");
@@ -33,6 +47,7 @@ const CombinedForm = () => {
         setFinalized(true);
         setShowForm(false);
       }
+      if (profile.pin) setJoinPin(profile.pin);
     }
   }, [profile]);
 
@@ -49,7 +64,7 @@ const CombinedForm = () => {
       return;
     }
     if (!canAdd) {
-      setWarning("⚠️ Please complete Gender, Name, Country Code, and Mobile.");
+      setWarning("⚠️ Complete Gender, Name, Country Code, Mobile.");
       return;
     }
     setWarning("");
@@ -74,6 +89,7 @@ const CombinedForm = () => {
         ...prev,
         {
           id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+          userId: user.uid,
           gender: formData.gender,
           name: formData.name.trim(),
           countryCode: formData.countryCode,
@@ -92,8 +108,8 @@ const CombinedForm = () => {
     }));
   };
 
-  // 👉 Finish form → save to ProfileContext
-  const handleFinish = () => {
+  // 👉 Finish form → save to Firestore + localForage
+  const handleFinish = async () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
       setWarning("⚠️ Please fill all data (Native, Current City).");
       return;
@@ -110,6 +126,7 @@ const CombinedForm = () => {
           ...members,
           {
             id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+            userId: user.uid,
             gender: formData.gender,
             name: formData.name.trim(),
             countryCode: formData.countryCode,
@@ -118,14 +135,50 @@ const CombinedForm = () => {
         ]
       : members;
 
-    const payload = {
-      nativeCity: formData.nativeCity,
-      currentCity: formData.currentCity,
-      members: updatedMembers
-    };
+    let familyDocRef;
 
-    // ✅ Save in ProfileContext (and localForage)
-    updateProfile(payload);
+    if (joinPin.trim()) {
+      // ✅ Join existing family via PIN
+      const familiesRef = collection(datastore, "families");
+      const q = query(familiesRef, where("pin", "==", joinPin));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const docSnap = querySnapshot.docs[0];
+        familyDocRef = doc(datastore, "families", docSnap.id);
+
+        const existingData = docSnap.data();
+        const newMembers = [
+          ...existingData.members,
+          ...updatedMembers.filter(
+            (m) => !existingData.members.some((em) => em.userId === m.userId)
+          )
+        ];
+
+        await updateDoc(familyDocRef, { members: newMembers });
+        updateProfile({ ...existingData, members: newMembers, id: docSnap.id, pin: joinPin });
+        alert("✅ Joined existing family successfully!");
+      } else {
+        setWarning("⚠️ Invalid PIN. Cannot join family.");
+        return;
+      }
+    } else {
+      // ✅ Create new family
+      const pin = Math.floor(1000 + Math.random() * 9000).toString();
+      const familyPayload = {
+        pin,
+        nativeCity: formData.nativeCity,
+        currentCity: formData.currentCity,
+        createdBy: user.uid,
+        members: updatedMembers
+      };
+
+      familyDocRef = doc(collection(datastore, "families")); // auto-ID
+      await setDoc(familyDocRef, familyPayload);
+      updateProfile({ ...familyPayload, id: familyDocRef.id });
+      setJoinPin(pin);
+      alert(`✅ Family created! Your family PIN is ${pin}`);
+    }
 
     setMembers(updatedMembers);
     setCityLocked(true);
@@ -152,7 +205,7 @@ const CombinedForm = () => {
   const deleteMember = (id) => {
     const updated = members.filter((m) => m.id !== id);
     setMembers(updated);
-    updateProfile({ ...profile, members: updated }); // ✅ persist delete
+    updateProfile({ ...profile, members: updated });
   };
 
   return (
@@ -174,6 +227,17 @@ const CombinedForm = () => {
         onChange={(e) => setFormData({ ...formData, currentCity: e.target.value })}
         className="border p-1 m-1"
       />
+
+      {/* Join Existing Family */}
+      <div className="mb-2">
+        <input
+          type="text"
+          placeholder="Enter Family PIN to join (optional)"
+          value={joinPin}
+          onChange={(e) => setJoinPin(e.target.value)}
+          className="border p-1 w-48"
+        />
+      </div>
 
       <h2 className="text-lg font-bold mt-3">👥 Added Members</h2>
       {members.map((m) => (
@@ -231,23 +295,20 @@ const CombinedForm = () => {
             className="border p-1 w-full my-2"
           />
 
-<div className="flex gap-2">
-  <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-2 rounded">
-    {editingId ? "Update" : "Add"}
-  </button>
+          <div className="flex gap-2">
+            <button onClick={handleAdd} className="bg-green-500 text-white px-3 py-2 rounded">
+              {editingId ? "Update" : "Add"}
+            </button>
 
-  {/* 👇 Hide Finish if editing */}
-  {!editingId && (
-    <button onClick={handleFinish} className="bg-blue-500 text-white px-3 py-2 rounded">
-      Finish
-    </button>
-  )}
-</div>
-
+            {!editingId && (
+              <button onClick={handleFinish} className="bg-blue-500 text-white px-3 py-2 rounded">
+                Finish
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Add New Member Button */}
       {finalized && !showForm && (
         <button
           className="bg-green-600 text-white px-4 py-2 rounded mt-3"

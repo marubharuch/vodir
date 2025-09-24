@@ -1,84 +1,207 @@
 // src/pages/LoginPage.jsx
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
-import localforage from 'localforage';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+} from "firebase/auth";
+import { auth } from "../firebase";
+import { useAuth } from "../context/AuthContext";
+import localforage from "localforage";
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // optional for now
-  const { login } = useAuth();
-  const navigate = useNavigate();
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
+  // 👉 Google Auth
+  const handleGoogleAuth = async () => {
+    const provider = new GoogleAuthProvider();
+    try {
+      setLoading(true);
+      const result = await signInWithPopup(auth, provider);
+      const firebaseUser = result.user;
+
+      // Plain object for storage
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName,
+        phoneNumber: firebaseUser.phoneNumber,
+      };
+
+      await localforage.setItem("authUser", userData);
+      await login(userData);
+
+      alert(`Welcome ${userData.displayName || userData.email}! 🎉 Login successful`);
+      navigate("/");
+    } catch (err) {
+      console.warn("Popup blocked, trying redirect…", err);
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr) {
+        console.error("Google redirect failed:", redirectErr);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 👉 Email/Password Auth
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      // Try to find the user in localforage
-      const savedUser = await localforage.getItem('authUser');
-
-      if (!savedUser || savedUser.email !== email) {
-        // User not found → redirect to registration
-        alert('User not registered. Redirecting to registration page...');
-        navigate('/register');
-        return;
+      let firebaseUser;
+      if (isRegister) {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        firebaseUser = userCredential.user;
+      } else {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        firebaseUser = userCredential.user;
       }
 
-      // User exists → log in
-      await login(savedUser);
-      console.log('User logged in:', savedUser);
-      navigate('/'); // go to homepage
+      const userData = {
+        uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        displayName: firebaseUser.displayName || name,
+        phoneNumber: firebaseUser.phoneNumber || mobile,
+      };
+
+      await localforage.setItem("authUser", userData);
+      await login(userData);
+
+      alert(`Welcome ${userData.displayName || userData.email}! 🎉`);
+      navigate("/");
     } catch (err) {
-      console.error('Login failed:', err);
-      alert('Something went wrong. Please try again.');
+      alert(err.message);
+      console.error("Auth error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 👉 Forgot Password
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert("Enter your email first.");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert("Password reset email sent.");
+    } catch (err) {
+      alert(err.message);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <div className="bg-white p-8 rounded shadow-md w-full max-w-sm">
-        <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
-        <form onSubmit={handleLogin}>
-          <div className="mb-4">
-            <label htmlFor="email" className="block text-gray-700 text-sm font-bold mb-2">
-              Email
-            </label>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-4">
+      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+          {isRegister ? "Create Account" : "Welcome Back"}
+        </h2>
+
+        {/* Google Login */}
+        <button
+          onClick={handleGoogleAuth}
+          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg shadow-md mb-4 transition"
+          disabled={loading}
+        >
+          {loading ? "Please wait..." : "Continue with Google"}
+        </button>
+
+        <div className="flex items-center my-4">
+          <hr className="flex-1 border-gray-300" />
+          <span className="px-2 text-sm text-gray-500">OR</span>
+          <hr className="flex-1 border-gray-300" />
+        </div>
+
+        {/* Email/Password Form */}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {isRegister && (
+            <>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Full Name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
+                  required
+                />
+              </div>
+              <div>
+                <input
+                  type="tel"
+                  placeholder="Mobile Number"
+                  value={mobile}
+                  onChange={(e) => setMobile(e.target.value)}
+                  className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
+                  required
+                />
+              </div>
+            </>
+          )}
+
+          <div>
             <input
               type="email"
-              id="email"
+              placeholder="Email Address"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
               required
             />
           </div>
-          <div className="mb-6">
-            <label htmlFor="password" className="block text-gray-700 text-sm font-bold mb-2">
-              Password
-            </label>
+          <div>
             <input
               type="password"
-              id="password"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:shadow-outline"
+              className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
+              required
             />
           </div>
-          <div className="flex items-center justify-between">
-            <button
-              type="submit"
-              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-            >
-              Sign In
-            </button>
-          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition"
+            disabled={loading}
+          >
+            {isRegister ? "Register" : "Login"}
+          </button>
         </form>
 
-        <p className="mt-4 text-center text-sm text-gray-600">
-          Not registered?{' '}
-          <Link to="/register" className="text-blue-500 hover:underline">
-            Sign up here
-          </Link>
+        {!isRegister && (
+          <button
+            onClick={handleForgotPassword}
+            className="text-sm text-blue-500 mt-3 hover:underline"
+          >
+            Forgot Password?
+          </button>
+        )}
+
+        <p className="mt-6 text-center text-gray-600">
+          {isRegister ? "Already have an account?" : "Don’t have an account?"}{" "}
+          <button
+            onClick={() => setIsRegister(!isRegister)}
+            className="text-blue-600 font-semibold hover:underline"
+          >
+            {isRegister ? "Login here" : "Register here"}
+          </button>
         </p>
       </div>
     </div>
