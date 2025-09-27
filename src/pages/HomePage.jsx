@@ -46,35 +46,19 @@ const HomePage = () => {
 
       {/* --- Ribbon --- */}
       <CityRibbon />
-{/*
-      
-      <Carousel images={images} />
-
-    
-      <CardList cards={cards} /> */}
+      {/* --- You can uncomment these if needed --- */}
+      {/* <Carousel images={images} /> */}
+      {/* <CardList cards={cards} /> */}
 
       {/* --- Profile Section --- */}
       <div className="p-4">
-        {profile ? (
-          <div className="mb-4 p-3 border rounded bg-gray-50">
-            <p>
-              <strong>Native City:</strong> {profile.nativeCity}
-            </p>
-            <p>
-              <strong>Current City:</strong> {profile.currentCity}
-            </p>
-            <p>
-              <strong>Members:</strong> {profile.members?.length || 0}
-            </p>
-          </div>
-        ) : (
-          <>
-            <p className="text-gray-600 mb-4">
-              No profile saved yet. Add your details below.
-            </p>
-            <CombinedForm />
-          </>
-        )}
+        {/*
+          This is the fix:
+          Always render the CombinedForm component.
+          The CombinedForm component will handle its own display logic
+          (e.g., show a view-only state, an edit button, or the form itself).
+        */}
+        <CombinedForm />
       </div>
     </div>
   );
