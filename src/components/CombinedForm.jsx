@@ -1,3 +1,18 @@
+// ✅ CombinedForm.jsx Summary (Hinglish):
+// Ye component ek Family management form hai jo user ko 
+// - Apni family banane, join karne, aur update karne deta hai.
+// - Data localforage (local storage) me save hota hai, aur Firestore se sync bhi ho sakta hai.
+// - Members add/edit/delete kar sakte ho (name, gender, mobile).
+// - PIN system hai family join karne ke liye.
+// - Agar profile already hai toh sync aur update ka option milta hai.
+
+// Features:
+// - CityInputs: Vatan aur Current City enter karne ke liye.
+// - MemberList: Already added members show karta hai (edit/delete option).
+// - MemberForm: New member add/edit karne ke liye form.
+// - handleFinish: Family data save karta hai (localforage me) aur join/create/update logic handle karta hai.
+// - handleDataSync: Firestore se latest data sync karta hai.
+
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../context/ProfileContext";
 import { datastore } from "../firebase";
@@ -13,11 +28,36 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext";
+import localforage from "localforage";
+
+import CityInputs from "./CityInputs";
+import MemberList from "./MemberList";
+import MemberForm from "./MemberForm";
 
 const CombinedForm = () => {
-  const { profile, updateProfile } = useProfile();
-  const { user } = useAuth();
+  const { profile, updateProfile } = useProfile(); // ✅ Context se profile aur update fn
+  const { user } = useAuth(); // ✅ AuthContext se logged-in user
+if(user)console.log("prof",user)
 
+// Get the user and profile from your context
+
+
+
+// A boolean variable to hold the result of the check
+const isUserAMember = profile?.members?.some(
+  (member) => member.userId === user?.uid
+);
+
+if (isUserAMember) {
+  console.log("The user is a member of this family.");
+  // Your logic for a logged-in member goes here
+} else {
+  console.log("The user is NOT a member of this family.");
+  // Your logic for a user who needs to join or create a family goes here
+}
+
+
+  // ✅ States
   const [members, setMembers] = useState([]);
   const [formData, setFormData] = useState({
     nativeCity: "",
@@ -27,16 +67,19 @@ const CombinedForm = () => {
     countryCode: "+91",
     mobile: "",
   });
-  const [joinPin, setJoinPin] = useState("");
-  const [warning, setWarning] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState(null);
+  const [joinPin, setJoinPin] = useState(""); // ✅ Family join karne ke liye PIN
+  const [warning, setWarning] = useState(""); // ✅ Error / Info messages
+  const [loading, setLoading] = useState(false); // ✅ Loading state
+  const [isEditing, setIsEditing] = useState(false); // ✅ Editing flag
+  const [editingId, setEditingId] = useState(null); // ✅ Currently edit ho raha member ka ID
 
-  // 👉 સ્માર્ટ ડેટા લોડિંગ: લોકલ, પછી ફાયરસ્ટોર
-  useEffect(() => {
+  // ✅ On mount / profile change => Family fetch karo (Firestore se ya local profile se)
+useEffect(() => {
     const fetchFamilyProfile = async () => {
-      if (profile) {
+      // 1. Check if we already have the profile data in context.
+      if (profile?.id) { // Use profile?.id to ensure it's a valid object, not just non-null
+        // Data is already loaded from Context, just update the local form states
+console.log("use effect")
         setFormData((s) => ({
           ...s,
           nativeCity: profile.nativeCity || "",
@@ -45,42 +88,45 @@ const CombinedForm = () => {
         setMembers(profile.members || []);
         setJoinPin(profile.pin || "");
         setIsEditing(true);
-        return;
+        setWarning("✅ તમારો ફેમિલી ડેટા લોડ થઈ ગયો છે!"); // Optional message
+        console.log("profile context",profile.members)
+        
+
+        return; // Exit here. No need to fetch again.
       }
 
-      if (user?.uid) {
+      // 2. If no profile in context, check Firestore.
+      if (isUserAMember) {
+        console.log("opt 2")
         setLoading(true);
         try {
-          const familiesRef = collection(datastore, "families");
-          
-          // FIX: આખું families કલેક્શન મેળવીને પછી લોકલી ફિલ્ટર કરો
-          const querySnapshot = await getDocs(familiesRef);
+          // ... (Your existing Firestore fetching logic remains here)
+            const familiesRef = collection(datastore, "families");
+            const querySnapshot = await getDocs(familiesRef);
 
-          let foundFamily = null;
-          querySnapshot.forEach((doc) => {
-            const familyData = doc.data();
-            const isMember = familyData.members.some(
-              (member) => member.userId === user.uid
-            );
-            if (isMember) {
-              foundFamily = { ...familyData, id: doc.id };
-            }
-          });
+            let foundFamily = null;
+            querySnapshot.forEach((doc) => {
+              const familyData = doc.data();
+              const isMember = familyData.members.some(
+                (member) => member.userId === user.uid
+              );
+              if (isMember) {
+                foundFamily = { ...familyData, id: doc.id };
+              }
+            });
+            // ... (End of existing Firestore fetching logic)
 
           if (foundFamily) {
-            updateProfile(foundFamily);
-            setMembers(foundFamily.members || []);
-            setJoinPin(foundFamily.pin || "");
-            setIsEditing(true);
+            // ⚠️ ONLY UPDATE CONTEXT ONCE HERE
+            updateProfile(foundFamily); 
+            // Local states will be set by the re-run that the context update triggers (Step 1)
             setWarning("✅ તમારો ફેમિલી ડેટા સિંક થઈ ગયો છે!");
           } else {
             setIsEditing(false);
-            setWarning(
-              "⚠️ તમારા માટે કોઈ ફેમિલી ડેટા મળ્યો નથી. કૃપા કરીને નવી ફેમિલી બનાવો."
-            );
+            setWarning("⚠️ તમારા માટે કોઈ ફેમિલી ડેટા મળ્યો નથી.");
           }
         } catch (err) {
-          setWarning("⚠️ ડેટા મેળવવામાં ભૂલ થઈ. ફરી પ્રયાસ કરો.");
+          setWarning("⚠️ ડેટા મેળવવામાં ભૂલ થઈ.");
           console.error("Fetch error:", err);
         } finally {
           setLoading(false);
@@ -91,13 +137,14 @@ const CombinedForm = () => {
     fetchFamilyProfile();
   }, [profile, user, updateProfile]);
 
+  // ✅ Member add/edit condition check
   const canAdd =
     formData.gender &&
     formData.name.trim() &&
     formData.countryCode.startsWith("+") &&
     formData.mobile.trim();
 
-  // 👉 સભ્ય ઉમેરો અથવા અપડેટ કરો
+  // ✅ Ek member ko list me add karna (ya edit karna)
   const handleAdd = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
       setWarning("⚠️ કૃપા કરીને પહેલા વતન અને હાલનું શહેર ભરો.");
@@ -110,21 +157,17 @@ const CombinedForm = () => {
     setWarning("");
 
     if (editingId) {
+      // Agar edit mode hai to update karo
       setMembers((prev) =>
         prev.map((m) =>
           m.id === editingId
-            ? {
-                ...m,
-                gender: formData.gender,
-                name: formData.name.trim(),
-                countryCode: formData.countryCode,
-                mobile: formData.mobile,
-              }
+            ? { ...m, ...formData, name: formData.name.trim() }
             : m
         )
       );
       setEditingId(null);
     } else {
+      // Naya member add karo
       setMembers((prev) => [
         ...prev,
         {
@@ -138,6 +181,7 @@ const CombinedForm = () => {
       ]);
     }
 
+    // ✅ Reset form fields
     setFormData((s) => ({
       ...s,
       gender: "",
@@ -147,45 +191,42 @@ const CombinedForm = () => {
     }));
   };
 
-  // 👉 ફેમિલી બનાવો અથવા જોડાઓ
-  const handleFinish = async () => {
+  // ✅ Family create/update/join karne ka main function
+{/*  const handleFinish = async () => {
     setLoading(true);
-    setWarning("");
-    // FIX: જો formData માં ડેટા હોય અને તે કોઈ સભ્યનો ન હોય તો તેને members માં ઉમેરો.
+    setWarning("finish function");
+
+    // Agar form me ek member ka data hai aur editing nahi ho rahi to usko add kar lo
     if (canAdd && !editingId) {
-        setMembers((prev) => [
-            ...prev,
-            {
-                id: crypto.randomUUID(),
-                userId: user.uid,
-                gender: formData.gender,
-                name: formData.name.trim(),
-                countryCode: formData.countryCode,
-                mobile: formData.mobile,
-            },
-        ]);
+      setMembers((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          userId: user.uid,
+          gender: formData.gender,
+          name: formData.name.trim(),
+          countryCode: formData.countryCode,
+          mobile: formData.mobile,
+        },
+      ]);
     }
 
-    // હવે members એરેની લંબાઈ તપાસો, કારણ કે ઉપર નવો ડેટા ઉમેરાઈ ગયો હશે.
+    // Agar members bilkul nahi hai aur PIN bhi nahi hai
     if (members.length === 0 && !joinPin.trim() && !(canAdd && !editingId)) {
-        setWarning("⚠️ ફેમિલી બનાવવા માટે કૃપા કરીને ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
-        setLoading(false);
-        return;
+      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
+      setLoading(false);
+      return;
     }
-
 
     try {
-      // કેસ 1: હાલની ફેમિલીમાં જોડાઓ
+      // ✅ LocalForage me families fetch karo
+      let families = (await localforage.getItem("families_${user.uid}")) || [];
+
       if (joinPin.trim() && !profile?.id) {
-        const familiesRef = collection(datastore, "families");
-        const q = query(familiesRef, where("pin", "==", joinPin));
-        const querySnapshot = await getDocs(q);
+        // ✅ JOIN FAMILY LOGIC
+        const existingFamily = families.find((f) => f.pin === joinPin);
 
-        if (!querySnapshot.empty) {
-          const docSnap = querySnapshot.docs[0];
-          const existingData = docSnap.data();
-
-          const newMembers = [...existingData.members];
+        if (existingFamily) {
           const newMemberData = {
             id: crypto.randomUUID(),
             userId: user.uid,
@@ -195,80 +236,222 @@ const CombinedForm = () => {
             mobile: formData.mobile,
           };
 
-          const existingMemberIndex = newMembers.findIndex(
-            (m) => m.mobile === newMemberData.mobile && m.countryCode === newMemberData.countryCode
+          // Agar same mobile wala member pehle se hai to update karo
+          const existingMemberIndex = existingFamily.members.findIndex(
+            (m) =>
+              m.mobile === newMemberData.mobile &&
+              m.countryCode === newMemberData.countryCode
           );
 
           if (existingMemberIndex > -1) {
-            newMembers[existingMemberIndex].userId = newMemberData.userId;
-            newMembers[existingMemberIndex].name = newMemberData.name;
+            existingFamily.members[existingMemberIndex] = {
+              ...existingFamily.members[existingMemberIndex],
+              ...newMemberData,
+            };
           } else {
-            newMembers.push(newMemberData);
+            existingFamily.members.push(newMemberData);
           }
 
-          const familyDocRef = doc(datastore, "families", docSnap.id);
-          await updateDoc(familyDocRef, {
-            members: newMembers,
-            updatedAt: serverTimestamp(),
-          });
+          // ✅ Update localforage
+          families = families.map((f) =>
+            f.pin === joinPin ? existingFamily : f
+          );
+          await localforage.setItem("families_${user.uid}", families);
 
-          updateProfile({
-            ...existingData,
-            members: newMembers,
-            id: docSnap.id,
-            pin: joinPin,
-          });
-          alert("✅ ફેમિલીમાં સફળતાપૂર્વક જોડાયા!");
+          updateProfile({ ...existingFamily, pin: joinPin });
+          alert("✅ ફેમિલીમાં જોડાયા!");
         } else {
           setWarning("⚠️ અમાન્ય PIN. ફેમિલી મળી નથી.");
         }
-      }
-      // કેસ 2: નવી ફેમિલી બનાવો અથવા અપડેટ કરો
-      else {
+      } else {
+        // ✅ CREATE OR UPDATE FAMILY LOGIC
         if (members.length === 0) {
-          setWarning("⚠️ કૃપા કરીને ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
+          setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
           return;
         }
 
         if (profile?.id) {
-          // અપડેટ કરો
-          const familyDocRef = doc(datastore, "families", profile.id);
-          await updateDoc(familyDocRef, {
+          // 🔄 Family update karo
+          families = families.map((f) =>
+            f.id === profile.id
+              ? {
+                  ...f,
+                  nativeCity: formData.nativeCity,
+                  currentCity: formData.currentCity,
+                  members: members,
+                  updatedAt: Date.now(),
+                }
+              : f
+          );
+
+          await localforage.setItem("families_${user.uid}", families);
+          updateProfile({
+            ...profile,
             nativeCity: formData.nativeCity,
             currentCity: formData.currentCity,
-            members: members,
-            updatedAt: serverTimestamp(),
+            members,
           });
-          updateProfile({ ...profile, nativeCity: formData.nativeCity, currentCity: formData.currentCity, members: members });
-          setWarning("✅ ફેમિલી ડેટા સફળતાપૂર્વક અપડેટ થયો!");
+          setWarning("✅ Family updated!");
         } else {
-          // બનાવો
+          // 🆕 New family create karo
           const pin = Math.floor(1000 + Math.random() * 9000).toString();
           const familyPayload = {
+            id: crypto.randomUUID(),
             pin,
             nativeCity: formData.nativeCity,
             currentCity: formData.currentCity,
             createdBy: user.uid,
-            members: members, // FIX: અહીં મેમ્બર્સ એરે સીધો ઉપયોગ કરો, નવો id ન આપો
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            members,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
           };
-          const familyDocRef = doc(collection(datastore, "families"));
-          await setDoc(familyDocRef, familyPayload);
-          updateProfile({ ...familyPayload, id: familyDocRef.id });
+
+          families.push(familyPayload);
+          await localforage.setItem("families_${user.uid}", families);
+
+          updateProfile(familyPayload);
           setJoinPin(pin);
-          alert(`✅ ફેમિલી બનાવવામાં આવી! તમારો PIN છે: ${pin}`);
+          alert(`✅ નવો Family bana! તમારો PIN: ${pin}`);
         }
       }
+
       setIsEditing(true);
     } catch (err) {
-      setWarning(`⚠️ ભૂલ થઈ. ફરી પ્રયાસ કરો.`);
-      console.error("Firebase error:", err);
+      setWarning(`⚠️ ભૂલ થઈ.`);
+      console.error("LocalForage error:", err);
     } finally {
       setLoading(false);
     }
   };
+*/}// ✅ Family create/update/join karne ka main function
+const handleFinish = async () => {
+  setLoading(true);
 
+  // 1. Agar form me ek member ka data hai aur editing nahi ho rahi to usko add kar lo
+  if (canAdd && !editingId) {
+    setMembers((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        userId: user.uid,
+        gender: formData.gender,
+        name: formData.name.trim(),
+        countryCode: formData.countryCode,
+        mobile: formData.mobile,
+      },
+    ]);
+  }
+
+  // 2. Agar members bilkul nahi hai aur PIN bhi nahi hai
+  const currentMembers = members.length > 0 ? members : (canAdd && !editingId) ? [{
+    id: crypto.randomUUID(),
+    userId: user.uid,
+    gender: formData.gender,
+    name: formData.name.trim(),
+    countryCode: formData.countryCode,
+    mobile: formData.mobile,
+  }] : [];
+
+  if (currentMembers.length === 0 && !joinPin.trim()) {
+    setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
+    setLoading(false);
+    return;
+  }
+
+  try {
+    // 3. ✅ LocalForage me families fetch karo
+    let families = (await localforage.getItem("families")) || [];
+
+    if (joinPin.trim() && !profile?.id) {
+      // 🤝 JOIN FAMILY LOGIC (Only LocalForage)
+      const existingFamily = families.find((f) => f.pin === joinPin);
+      if (existingFamily) {
+        const newMemberData = {
+          id: crypto.randomUUID(),
+          userId: user.uid,
+          gender: formData.gender,
+          name: formData.name.trim(),
+          countryCode: formData.countryCode,
+          mobile: formData.mobile,
+        };
+        const existingMemberIndex = existingFamily.members.findIndex(
+          (m) => m.mobile === newMemberData.mobile && m.countryCode === newMemberData.countryCode
+        );
+
+        if (existingMemberIndex > -1) {
+          existingFamily.members[existingMemberIndex] = {
+            ...existingFamily.members[existingMemberIndex],
+            ...newMemberData,
+          };
+        } else {
+          existingFamily.members.push(newMemberData);
+        }
+
+        families = families.map((f) => (f.pin === joinPin ? existingFamily : f));
+        await localforage.setItem("families", families);
+        updateProfile({ ...existingFamily, pin: joinPin });
+        alert("✅ ફેમિલીમાં જોડાયા!");
+      } else {
+        setWarning("⚠️ અમાન્ય PIN. ફેમિલી મળી નથી.");
+      }
+    } else {
+      // 🆕 CREATE or UPDATE FAMILY LOGIC (LocalForage and Firestore)
+      const familyPayload = {
+        nativeCity: formData.nativeCity,
+        currentCity: formData.currentCity,
+        members: currentMembers,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (profile?.id) {
+        // 🔄 UPDATE Existing family in Firestore
+        const familyDocRef = doc(datastore, "families", profile.id);
+        await updateDoc(familyDocRef, familyPayload);
+        setWarning("✅ Family updated to Firestore!");
+
+        // Update localforage
+        const updatedLocalFamilies = families.map((f) =>
+          f.id === profile.id ? { ...f, ...familyPayload } : f
+        );
+        await localforage.setItem("families", updatedLocalFamilies);
+        updateProfile({ ...profile, ...familyPayload });
+
+      } else {
+        // 🆕 CREATE New family in Firestore
+        const familiesCollectionRef = collection(datastore, "families");
+        const pin = Math.floor(1000 + Math.random() * 9000).toString();
+        const newDocRef = doc(familiesCollectionRef);
+
+        const newFamilyPayload = {
+          ...familyPayload,
+          pin,
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          id: newDocRef.id, // Store Firestore ID locally
+        };
+
+        await setDoc(newDocRef, newFamilyPayload);
+        setJoinPin(pin);
+        alert(`✅ નવો Family બનાવો! તમારો PIN: ${pin}`);
+        setWarning("✅ New family created in Firestore!");
+
+        // Store in localforage after successful Firestore operation
+        families.push(newFamilyPayload);
+        await localforage.setItem("families", families);
+        updateProfile(newFamilyPayload);
+      }
+    }
+
+    setIsEditing(true);
+  } catch (err) {
+    setWarning(`⚠️ ભૂલ થઈ.`);
+    console.error("Operation error:", err);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  // ✅ Member edit mode activate karna
   const startEditMember = (id) => {
     const m = members.find((x) => x.id === id);
     if (!m) return;
@@ -282,15 +465,16 @@ const CombinedForm = () => {
     });
   };
 
+  // ✅ Member delete
   const deleteMember = (id) => {
     const updated = members.filter((m) => m.id !== id);
     setMembers(updated);
   };
 
-  // 👉 ડેટા સિંક
+  // ✅ Firestore se sync karna (manual refresh)
   const handleDataSync = async () => {
     if (!profile?.id) {
-      setWarning("⚠️ સંપાદન માટે કોઈ પ્રોફાઇલ ઉપલબ્ધ નથી.");
+      setWarning("⚠️ કોઈ પ્રોફાઇલ નથી.");
       return;
     }
     setLoading(true);
@@ -307,12 +491,12 @@ const CombinedForm = () => {
           nativeCity: firestoreData.nativeCity,
           currentCity: firestoreData.currentCity,
         }));
-        setWarning("✅ ડેટા સફળતાપૂર્વક સિંક થયો!");
+        setWarning("✅ Firestore sync success!");
       } else {
-        setWarning("⚠️ ફેમિલી ડેટા ફાયરસ્ટોરમાં મળ્યો નથી.");
+        setWarning("⚠️ Firestore me data nahi mila.");
       }
     } catch (err) {
-      setWarning("⚠️ ડેટા સિંક કરવામાં ભૂલ થઈ. ફરી પ્રયાસ કરો.");
+      setWarning("⚠️ Sync error.");
       console.error("Sync error:", err);
     } finally {
       setLoading(false);
@@ -321,6 +505,7 @@ const CombinedForm = () => {
 
   return (
     <div className="p-3">
+      {/* ✅ Agar profile hai aur edit mode nahi hai to Sync button dikhao */}
       {profile && !editingId && (
         <button
           onClick={handleDataSync}
@@ -331,129 +516,36 @@ const CombinedForm = () => {
         </button>
       )}
 
+      {/* ✅ CityInputs, MemberList aur MemberForm dikhana */}
       {(!profile || isEditing) && (
         <>
-          <h2 className="text-lg font-bold">🏠 શહેરની માહિતી</h2>
-          <input
-            type="text"
-            placeholder="વતન શહેર"
-            value={formData.nativeCity}
-            onChange={(e) =>
-              setFormData({ ...formData, nativeCity: e.target.value })
-            }
-            className="border p-1 m-1"
-          />
-          <input
-            type="text"
-            placeholder="હાલનું શહેર"
-            value={formData.currentCity}
-            onChange={(e) =>
-              setFormData({ ...formData, currentCity: e.target.value })
-            }
-            className="border p-1 m-1"
+          <CityInputs
+            formData={formData}
+            setFormData={setFormData}
+            joinPin={joinPin}
+            setJoinPin={setJoinPin}
+            profile={profile}
           />
 
-          {!profile && (
-            <div className="mb-2">
-              <input
-                type="text"
-                placeholder="ફેમિલી PIN દાખલ કરો"
-                value={joinPin}
-                onChange={(e) => setJoinPin(e.target.value)}
-                className="border p-1 w-48"
-              />
-            </div>
-          )}
+          <MemberList
+            members={members}
+            startEditMember={startEditMember}
+            deleteMember={deleteMember}
+          />
 
-          <h2 className="text-lg font-bold mt-3">👥 ઉમેરાયેલા સભ્યો</h2>
-          {members.map((m) => (
-            <div
-              key={m.id}
-              className="flex justify-between items-center border p-2 m-1 rounded"
-            >
-              <span>
-                {m.gender}: {m.name} ({m.countryCode} {m.mobile})
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => startEditMember(m.id)}
-                  className="bg-yellow-400 px-2 py-1 rounded"
-                >
-                  ✏️
-                </button>
-                <button
-                  onClick={() => deleteMember(m.id)}
-                  className="bg-red-500 text-white px-2 py-1 rounded"
-                >
-                  🗑️
-                </button>
-              </div>
-            </div>
-          ))}
-
-          <div className="mt-3 border p-3 rounded">
-            <h2 className="text-lg font-bold">📝 સભ્યની વિગતો</h2>
-            <div className="flex gap-2 my-2 w-full max-w-full">
-              <select
-                value={formData.gender}
-                onChange={(e) =>
-                  setFormData({ ...formData, gender: e.target.value })
-                }
-                className="border p-1 w-1/5"
-              >
-                <option value="">M/F</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-              </select>
-              <input
-                type="text"
-                value={formData.countryCode}
-                onChange={(e) =>
-                  setFormData({ ...formData, countryCode: e.target.value })
-                }
-                className="border p-1 w-16 flex-shrink-0"
-              />
-              <input
-                type="text"
-                placeholder="મોબાઇલ"
-                value={formData.mobile}
-                onChange={(e) =>
-                  setFormData({ ...formData, mobile: e.target.value })
-                }
-                className="border p-1 flex-1 min-w-0"
-              />
-            </div>
-            <input
-              type="text"
-              placeholder="નામ"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              className="border p-1 w-full my-2"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={handleAdd}
-                className="bg-green-500 text-white px-3 py-2 rounded"
-              >
-                {editingId ? "અપડેટ" : "ઉમેરો"}
-              </button>
-              <button
-                onClick={handleFinish}
-                className="bg-blue-500 text-white px-3 py-2 rounded"
-              >
-                {profile?.id
-                  ? "ડેટા સેવ કરો"
-                  : joinPin.trim()
-                  ? "ફેમિલીમાં જોડાઓ"
-                  : "ફેમિલી બનાવો"}
-              </button>
-            </div>
-          </div>
+          <MemberForm
+            formData={formData}
+            setFormData={setFormData}
+            handleAdd={handleAdd}
+            handleFinish={handleFinish}
+            editingId={editingId}
+            profile={profile}
+            joinPin={joinPin}
+          />
         </>
       )}
 
+      {/* ✅ Warning / Messages */}
       {warning && <p className="text-red-500 mt-2">{warning}</p>}
     </div>
   );
