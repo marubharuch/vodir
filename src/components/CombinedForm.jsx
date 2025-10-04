@@ -1,20 +1,6 @@
-// ✅ CombinedForm.jsx Summary (Hinglish):
-// Ye component ek Family management form hai jo user ko 
-// - Apni family banane, join karne, aur update karne deta hai.
-// - Data localforage (local storage) me save hota hai, aur Firestore se sync bhi ho sakta hai.
-// - Members add/edit/delete kar sakte ho (name, gender, mobile).
-// - PIN system hai family join karne ke liye.
-// - Agar profile already hai toh sync aur update ka option milta hai.
-
-// Features:
-// - CityInputs: Vatan aur Current City enter karne ke liye.
-// - MemberList: Already added members show karta hai (edit/delete option).
-// - MemberForm: New member add/edit karne ke liye form.
-// - handleFinish: Family data save karta hai (localforage me) aur join/create/update logic handle karta hai.
-// - handleDataSync: Firestore se latest data sync karta hai.
-
 import React, { useState, useEffect } from "react";
 import { useProfile } from "../context/ProfileContext";
+// ✅ FIRESTORE IMPORTS
 import { datastore } from "../firebase";
 import {
   collection,
@@ -22,40 +8,142 @@ import {
   setDoc,
   updateDoc,
   getDoc,
-  getDocs,
-  query,
-  where,
   serverTimestamp,
 } from "firebase/firestore";
+// ✅ RTDB IMPORTS (New Imports for Indexing)
+import { db } from "../firebase"; 
+import { ref, runTransaction, get, set } from "firebase/database"; 
 import { useAuth } from "../context/AuthContext";
 import localforage from "localforage";
 
 import CityInputs from "./CityInputs";
 import MemberList from "./MemberList";
-import MemberForm from "./MemberForm";
+
+// 🆕 NEW COMPONENT: LocalForageDataModal (Utility)
+const LocalForageDataModal = ({ show, content, onClose, userUid }) => {
+  if (!show) return null;
+
+  return (
+    <div 
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+        backgroundColor: 'rgba(0,0,0,0.5)', 
+        display: 'flex', justifyContent: 'center', alignItems: 'center', 
+        zIndex: 1000 
+      }}
+    >
+      <div 
+        style={{
+          backgroundColor: 'white', padding: '20px', borderRadius: '8px', 
+          maxWidth: '90%', maxHeight: '80%', overflowY: 'auto', 
+          boxShadow: '0 4px 12px rgba(0,0,0,0.2)' 
+        }}
+      >
+        <h3 style={{ borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
+          LocalForage Data for User: {userUid}
+        </h3>
+        <p>This is the current state of the local family data on this device:</p>
+        <pre 
+          style={{ 
+            whiteSpace: 'pre-wrap', 
+            wordWrap: 'break-word', 
+            background: '#f4f4f4', 
+            padding: '10px', 
+            borderRadius: '4px', 
+            fontSize: '12px' 
+          }}
+        >
+          {content}
+        </pre>
+        <button 
+          onClick={onClose} 
+          style={{ 
+            marginTop: '15px', padding: '8px 15px', 
+            backgroundColor: '#007bff', color: 'white', border: 'none', 
+            borderRadius: '4px', cursor: 'pointer' 
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// 📌 MemberForm definition (Single Member Actions)
+const MemberForm = ({
+  formData,
+  setFormData,
+  handleMemberSave, 
+  handleCancelEdit,
+  editingId,
+}) => {
+  return (
+    <div className="mt-3 border p-3 rounded">
+      <h2 className="text-lg font-bold">📝 સભ્યની વિગતો</h2>
+      <div className="flex gap-2 my-2 w-full max-w-full">
+        <select
+          value={formData.gender}
+          onChange={(e) =>
+            setFormData({ ...formData, gender: e.target.value })
+          }
+          className="border p-1 w-1/5"
+        >
+          <option value="">M/F</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+        </select>
+        <input
+          type="text"
+          value={formData.countryCode}
+          onChange={(e) =>
+            setFormData({ ...formData, countryCode: e.target.value })
+          }
+          className="border p-1 w-16 flex-shrink-0"
+        />
+        <input
+          type="text"
+          placeholder="મોબાઇલ"
+          value={formData.mobile}
+          onChange={(e) =>
+            setFormData({ ...formData, mobile: e.target.value })
+          }
+          className="border p-1 flex-1 min-w-0"
+        />
+      </div>
+      <input
+        type="text"
+        placeholder="નામ"
+        value={formData.name}
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        className="border p-1 w-full my-2"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={handleMemberSave} 
+          className="bg-green-500 text-white px-3 py-2 rounded hover:bg-green-600"
+        >
+          {editingId ? "અપડેટ કરો" : "સેવ કરો"}
+        </button>
+        <button
+          onClick={handleCancelEdit} 
+          className="bg-red-500 text-white px-3 py-2 rounded hover:bg-red-600"
+        >
+          રદ કરો
+        </button>
+      </div>
+    </div>
+  );
+};
+
 
 const CombinedForm = () => {
-  const { profile, updateProfile } = useProfile(); // ✅ Context se profile aur update fn
-  const { user } = useAuth(); // ✅ AuthContext se logged-in user
-if(user)console.log("prof",user)
+  const { profile, updateProfile } = useProfile();
+  const { user } = useAuth();
+  if(user) console.log("Current User UID:", user.uid);
 
-// Get the user and profile from your context
-
-
-
-// A boolean variable to hold the result of the check
-const isUserAMember = profile?.members?.some(
-  (member) => member.userId === user?.uid
-);
-
-if (isUserAMember) {
-  console.log("The user is a member of this family.");
-  // Your logic for a logged-in member goes here
-} else {
-  console.log("The user is NOT a member of this family.");
-  // Your logic for a user who needs to join or create a family goes here
-}
-
+  const [showDataModal, setShowDataModal] = useState(false);
+  const [localForageDataModalContent, setLocalForageDataModalContent] = useState('');
 
   // ✅ States
   const [members, setMembers] = useState([]);
@@ -67,84 +155,104 @@ if (isUserAMember) {
     countryCode: "+91",
     mobile: "",
   });
-  const [joinPin, setJoinPin] = useState(""); // ✅ Family join karne ke liye PIN
-  const [warning, setWarning] = useState(""); // ✅ Error / Info messages
-  const [loading, setLoading] = useState(false); // ✅ Loading state
-  const [isEditing, setIsEditing] = useState(false); // ✅ Editing flag
-  const [editingId, setEditingId] = useState(null); // ✅ Currently edit ho raha member ka ID
+  const [joinSrno, setJoinSrno] = useState(""); 
+  const [warning, setWarning] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
-  // ✅ On mount / profile change => Family fetch karo (Firestore se ya local profile se)
-useEffect(() => {
+  // ✅ HYBRID FETCH: On mount / profile change => Family fetch karo 
+  useEffect(() => {
     const fetchFamilyProfile = async () => {
-      // 1. Check if we already have the profile data in context.
-      if (profile?.id) { // Use profile?.id to ensure it's a valid object, not just non-null
-        // Data is already loaded from Context, just update the local form states
-console.log("use effect")
+      setLoading(true);
+
+      // 1. Local Data Found: Load from profile context (Zero cost)
+      if (profile?.id) {
         setFormData((s) => ({
           ...s,
           nativeCity: profile.nativeCity || "",
           currentCity: profile.currentCity || "",
         }));
         setMembers(profile.members || []);
-        setJoinPin(profile.pin || "");
         setIsEditing(true);
-        setWarning("✅ તમારો ફેમિલી ડેટા લોડ થઈ ગયો છે!"); // Optional message
-        console.log("profile context",profile.members)
-        
-
-        return; // Exit here. No need to fetch again.
+        setWarning("✅ તમારો ફેમિલી ડેટા લોડ થઈ ગયો છે!");
+        setLoading(false);
+        return;
       }
 
-      // 2. If no profile in context, check Firestore.
-      if (isUserAMember) {
-        console.log("opt 2")
-        setLoading(true);
+      // 2. New Device/No Local Data: Check RTDB Index for Family SRNO
+      if (user) {
         try {
-          // ... (Your existing Firestore fetching logic remains here)
-            const familiesRef = collection(datastore, "families");
-            const querySnapshot = await getDocs(familiesRef);
+            // 🚀 RTDB LOOKUP: User ke UID se Family SRNO find karein (Minimal cost)
+            const srnoRef = ref(db, `users/${user.uid}/familySrno`);
+            const srnoSnapshot = await get(srnoRef);
+            const familySrno = srnoSnapshot.val();
+            console.log(`FETCH: RTDB lookup for ${user.uid} returned SRNO:`, familySrno);
 
-            let foundFamily = null;
-            querySnapshot.forEach((doc) => {
-              const familyData = doc.data();
-              const isMember = familyData.members.some(
-                (member) => member.userId === user.uid
-              );
-              if (isMember) {
-                foundFamily = { ...familyData, id: doc.id };
-              }
-            });
-            // ... (End of existing Firestore fetching logic)
+            if (familySrno) {
+                // 🎉 Data found in RTDB Index! Ab seedha Firestore se fetch karo (Single read cost)
+                const familyDocRef = doc(datastore, "families", familySrno.toString());
+                const familyDocSnap = await getDoc(familyDocRef);
 
-          if (foundFamily) {
-            // ⚠️ ONLY UPDATE CONTEXT ONCE HERE
-            updateProfile(foundFamily); 
-            // Local states will be set by the re-run that the context update triggers (Step 1)
-            setWarning("✅ તમારો ફેમિલી ડેટા સિંક થઈ ગયો છે!");
-          } else {
-            setIsEditing(false);
-            setWarning("⚠️ તમારા માટે કોઈ ફેમિલી ડેટા મળ્યો નથી.");
-          }
+                if (familyDocSnap.exists()) {
+                    const familyData = { id: familyDocSnap.id, ...familyDocSnap.data() };
+                    
+                    // Update profile automatically saves to localforage
+                    await updateProfile(familyData); 
+                    setMembers(familyData.members || []);
+                    setIsEditing(true);
+                    setWarning(`✅ Family ${familyDocSnap.id} synced via RTDB index.`);
+                } else {
+                    setIsEditing(true); 
+                    setWarning("⚠️ RTDB index mila, par family data Firestore mein nahi mila. Naya family banao.");
+                }
+            } else {
+                // RTDB index mein nahi mila (Brand new user/Join mode)
+                setIsEditing(true);
+                setWarning("⚠️ No family found. Create a new one or Join (SRNO).");
+            }
         } catch (err) {
-          setWarning("⚠️ ડેટા મેળવવામાં ભૂલ થઈ.");
-          console.error("Fetch error:", err);
-        } finally {
-          setLoading(false);
+            console.error("RTDB/Firestore fetch error:", err);
+            setWarning("⚠️ Data fetch error. Check console.");
         }
+      } else {
+        setIsEditing(false);
+        setWarning("⚠️ Log in to create or join a family.");
       }
+      setLoading(false);
     };
 
-    fetchFamilyProfile();
+    if (!user) {
+        setWarning("⚠️ Log in to create or join a family.");
+        setLoading(false);
+    } else {
+        fetchFamilyProfile();
+    }
   }, [profile, user, updateProfile]);
 
-  // ✅ Member add/edit condition check
+  const showLocalForageDataModal = async () => {
+    try {
+      const localForageKey = `profileData_${user.uid}`;
+      const allData = await localforage.getItem(localForageKey);
+      const content = JSON.stringify(allData, null, 2);
+      
+      setLocalForageDataModalContent(content); 
+      setShowDataModal(true); 
+      
+    } catch (err) {
+      console.error("Error retrieving all LocalForage data:", err);
+      setLocalForageDataModalContent(`Error retrieving data: ${err.message}`);
+      setShowDataModal(true);
+    }
+  };
+
   const canAdd =
     formData.gender &&
     formData.name.trim() &&
     formData.countryCode.startsWith("+") &&
     formData.mobile.trim();
 
-  // ✅ Ek member ko list me add karna (ya edit karna)
+  // ✅ handleAdd/handleMemberSave (MemberForm se call hoga)
   const handleAdd = () => {
     if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
       setWarning("⚠️ કૃપા કરીને પહેલા વતન અને હાલનું શહેર ભરો.");
@@ -155,9 +263,9 @@ console.log("use effect")
       return;
     }
     setWarning("");
+    console.log("MEMBER ACTION: Adding/Updating a single member.");
 
     if (editingId) {
-      // Agar edit mode hai to update karo
       setMembers((prev) =>
         prev.map((m) =>
           m.id === editingId
@@ -167,7 +275,6 @@ console.log("use effect")
       );
       setEditingId(null);
     } else {
-      // Naya member add karo
       setMembers((prev) => [
         ...prev,
         {
@@ -181,7 +288,7 @@ console.log("use effect")
       ]);
     }
 
-    // ✅ Reset form fields
+    // Clear form fields after save/update
     setFormData((s) => ({
       ...s,
       gender: "",
@@ -191,267 +298,203 @@ console.log("use effect")
     }));
   };
 
-  // ✅ Family create/update/join karne ka main function
-{/*  const handleFinish = async () => {
-    setLoading(true);
-    setWarning("finish function");
+  // 🆕 New function to handle member edit cancellation
+  const handleCancelEdit = () => {
+      setEditingId(null);
+      setFormData((s) => ({
+        ...s,
+        gender: "",
+        name: "",
+        countryCode: "+91",
+        mobile: "",
+      }));
+      setWarning("");
+      console.log("MEMBER ACTION: Edit cancelled/Form cleared.");
+  };
 
-    // Agar form me ek member ka data hai aur editing nahi ho rahi to usko add kar lo
+  // ✅ handleFinish (Family Data Save Karo button se call hoga)
+  const handleFinish = async () => {
+    console.log("--- HANDLE FINISH START (Family Save) ---");
+    setLoading(true);
+
+    let finalMembersToSave = [...members]; 
+
+    // 1. FINAL CHECK: Agar form mein unsaved member data hai, toh use pehle list mein add karo.
     if (canAdd && !editingId) {
-      setMembers((prev) => [
-        ...prev,
-        {
+        console.log("LOGIC: Unsaved member data found. Adding synchronously to payload.");
+        finalMembersToSave.push({
           id: crypto.randomUUID(),
           userId: user.uid,
           gender: formData.gender,
           name: formData.name.trim(),
           countryCode: formData.countryCode,
           mobile: formData.mobile,
-        },
-      ]);
+        });
+        // Clear the form fields since data is now in payload
+        setFormData((s) => ({
+            ...s,
+            gender: "",
+            name: "",
+            countryCode: "+91",
+            mobile: "",
+        }));
     }
 
-    // Agar members bilkul nahi hai aur PIN bhi nahi hai
-    if (members.length === 0 && !joinPin.trim() && !(canAdd && !editingId)) {
-      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
+    // 2. Early Exit Check (using the final list)
+    if (finalMembersToSave.length === 0 && !joinSrno.trim()) {
+      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો અથવા SRNO દાખલ કરો.");
       setLoading(false);
+      console.log("EXIT: No members and no SRNO. Returning early.");
       return;
     }
 
+    const masterIndexRef = ref(db, 'master/familyIndex');
+    const userIndexRef = ref(db, `users/${user.uid}/familySrno`);
+    const familiesRef = collection(datastore, "families");
+    const localForageKey = `profileData_${user.uid}`;
+    let successMessage = "";
+
     try {
-      // ✅ LocalForage me families fetch karo
-      let families = (await localforage.getItem("families_${user.uid}")) || [];
+        let finalFamilyPayload = {};
+        let familyIdToSave = profile?.id;
+        const isJoining = joinSrno.trim() && !profile?.id;
 
-      if (joinPin.trim() && !profile?.id) {
-        // ✅ JOIN FAMILY LOGIC
-        const existingFamily = families.find((f) => f.pin === joinPin);
+        // 🤝 JOIN FAMILY LOGIC (Firestore/RTDB Index Update)
+        if (isJoining) {
+            console.log("FLOW: Entering JOIN Family Logic. SRNO:", joinSrno);
+            const srnoToJoin = joinSrno.trim();
+            const existingFamilyRef = doc(familiesRef, srnoToJoin);
+            const existingFamilyDoc = await getDoc(existingFamilyRef);
 
-        if (existingFamily) {
-          const newMemberData = {
-            id: crypto.randomUUID(),
-            userId: user.uid,
-            gender: formData.gender,
-            name: formData.name.trim(),
-            countryCode: formData.countryCode,
-            mobile: formData.mobile,
-          };
+            if (existingFamilyDoc.exists()) {
+                const existingFamilyData = existingFamilyDoc.data();
+                familyIdToSave = existingFamilyDoc.id; 
+                
+                const currentUserData = finalMembersToSave.find(m => m.userId === user.uid) || finalMembersToSave[0];
+                if (!currentUserData) throw new Error("Current user data missing from members list.");
 
-          // Agar same mobile wala member pehle se hai to update karo
-          const existingMemberIndex = existingFamily.members.findIndex(
-            (m) =>
-              m.mobile === newMemberData.mobile &&
-              m.countryCode === newMemberData.countryCode
-          );
-
-          if (existingMemberIndex > -1) {
-            existingFamily.members[existingMemberIndex] = {
-              ...existingFamily.members[existingMemberIndex],
-              ...newMemberData,
-            };
-          } else {
-            existingFamily.members.push(newMemberData);
-          }
-
-          // ✅ Update localforage
-          families = families.map((f) =>
-            f.pin === joinPin ? existingFamily : f
-          );
-          await localforage.setItem("families_${user.uid}", families);
-
-          updateProfile({ ...existingFamily, pin: joinPin });
-          alert("✅ ફેમિલીમાં જોડાયા!");
-        } else {
-          setWarning("⚠️ અમાન્ય PIN. ફેમિલી મળી નથી.");
-        }
-      } else {
-        // ✅ CREATE OR UPDATE FAMILY LOGIC
-        if (members.length === 0) {
-          setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
-          return;
-        }
-
-        if (profile?.id) {
-          // 🔄 Family update karo
-          families = families.map((f) =>
-            f.id === profile.id
-              ? {
-                  ...f,
-                  nativeCity: formData.nativeCity,
-                  currentCity: formData.currentCity,
-                  members: members,
-                  updatedAt: Date.now(),
+                let updatedMembers = existingFamilyData.members.map(m => {
+                    if (m.mobile === currentUserData.mobile && m.countryCode === currentUserData.countryCode) {
+                        return { ...m, userId: user.uid }; // Update existing user entry
+                    }
+                    return m;
+                });
+                
+                // If user wasn't in members array by mobile/countryCode, add them
+                if (!updatedMembers.some(m => m.userId === user.uid)) {
+                     updatedMembers.push({ ...currentUserData, userId: user.uid });
                 }
-              : f
-          );
 
-          await localforage.setItem("families_${user.uid}", families);
-          updateProfile({
-            ...profile,
-            nativeCity: formData.nativeCity,
-            currentCity: formData.currentCity,
-            members,
-          });
-          setWarning("✅ Family updated!");
-        } else {
-          // 🆕 New family create karo
-          const pin = Math.floor(1000 + Math.random() * 9000).toString();
-          const familyPayload = {
-            id: crypto.randomUUID(),
-            pin,
-            nativeCity: formData.nativeCity,
-            currentCity: formData.currentCity,
-            createdBy: user.uid,
-            members,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          };
+                finalFamilyPayload = {
+                    ...existingFamilyData,
+                    members: updatedMembers,
+                    updatedAt: serverTimestamp(),
+                };
+                
+                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); // 👈 FIREBASE WRITE
+                await set(userIndexRef, familyIdToSave); // 👈 RTDB WRITE (Index)
+                successMessage = `✅ Family ${familyIdToSave} joined and data synced!`;
 
-          families.push(familyPayload);
-          await localforage.setItem("families_${user.uid}", families);
+            } else {
+                setWarning(`⚠️ Invalid Family ID (SRNO): ${srnoToJoin}. Family not found in Firestore.`);
+                setLoading(false);
+                return;
+            }
+        } 
+        // 🆕 CREATE or 🔄 UPDATE LOGIC
+        else {
+            if (!profile?.id) {
+                // --- RTDB TRANSACTION for SRNO (NEW FAMILY CREATION) ---
+                console.log("FLOW: Entering CREATE New Family Logic.");
+                let newSrno;
+                const result = await runTransaction(masterIndexRef, (currentData) => { 
+                    let data = currentData || { nextSrno: 1 };
+                    newSrno = data.nextSrno || 1;
+                    data.nextSrno = newSrno + 1;
+                    return data; 
+                });
 
-          updateProfile(familyPayload);
-          setJoinPin(pin);
-          alert(`✅ નવો Family bana! તમારો PIN: ${pin}`);
+                if (!result.committed) {
+                    throw new Error("Failed to commit RTDB transaction for SRNO. Please retry.");
+                }
+                
+                familyIdToSave = newSrno.toString(); 
+                const pin = Math.floor(1000 + Math.random() * 9000).toString(); 
+
+                finalFamilyPayload = {
+                    nativeCity: formData.nativeCity,
+                    currentCity: formData.currentCity,
+                    members: finalMembersToSave,
+                    pin, 
+                    createdBy: user.uid,
+                    createdAt: serverTimestamp(),
+                };
+                
+                // 1. FIREBASE WRITE: Create family document
+                await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
+                console.log("TRACE: Firestore family doc created successfully at:", familyIdToSave);
+                
+                // 2. RTDB WRITE: Create user index (The step that was previously failing)
+                try {
+                    console.log("TRACE: Attempting RTDB Index write for UID:", user.uid, "with SRNO:", familyIdToSave);
+                    await set(userIndexRef, familyIdToSave); 
+                    console.log("TRACE: RTDB Index write successful!");
+                    successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}. Index synced.`;
+                } catch (rtdbErr) {
+                    // CRITICAL ERROR: Document created, but index failed.
+                    console.error("TRACE ERROR: RTDB Index write FAILED. Document created but index failed.", rtdbErr);
+                    // Throw the error to stop the process and alert the user
+                    throw new Error(`RTDB Indexing failed. Family ID is: ${familyIdToSave}. Error: ${rtdbErr.message}`);
+                }
+
+
+            } else {
+                // 🔄 UPDATE Existing family
+                console.log("FLOW: Entering UPDATE Existing Family Logic. ID:", profile.id);
+                familyIdToSave = profile.id;
+                
+                finalFamilyPayload = {
+                    nativeCity: formData.nativeCity,
+                    currentCity: formData.currentCity,
+                    members: finalMembersToSave,
+                    updatedAt: serverTimestamp(),
+                };
+                
+                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); // 👈 FIREBASE WRITE
+                successMessage = `✅ Family ${familyIdToSave} updated successfully!`;
+            }
         }
-      }
 
-      setIsEditing(true);
+        // 5. Local State Update (Saves to localforage)
+        const localDataToSave = {
+            ...finalFamilyPayload,
+            id: familyIdToSave, 
+            pin: finalFamilyPayload.pin || profile?.pin || joinSrno, // Pin/SRNO ko local data mein store karna zaroori hai
+            updatedAt: Date.now(), 
+            createdAt: finalFamilyPayload.createdAt || profile?.createdAt
+        };
+        
+        await updateProfile(localDataToSave); // Saves to state and localforage
+        setMembers(finalMembersToSave); // Sync members state
+        setIsEditing(true);
+        
+        if (successMessage) {
+            alert(successMessage);
+        }
+        
+        await showLocalForageDataModal(); 
+        
     } catch (err) {
-      setWarning(`⚠️ ભૂલ થઈ.`);
-      console.error("LocalForage error:", err);
+        setWarning(`⚠️ Save failed.`);
+        console.error("RTDB/Firestore error:", err);
+        alert(`⚠️ Save failed. ${err.message || ''}`);
     } finally {
-      setLoading(false);
+        console.log("--- HANDLE FINISH END | Loading Set to false ---");
+        setLoading(false);
     }
   };
-*/}// ✅ Family create/update/join karne ka main function
-const handleFinish = async () => {
-  setLoading(true);
 
-  // 1. Agar form me ek member ka data hai aur editing nahi ho rahi to usko add kar lo
-  if (canAdd && !editingId) {
-    setMembers((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        userId: user.uid,
-        gender: formData.gender,
-        name: formData.name.trim(),
-        countryCode: formData.countryCode,
-        mobile: formData.mobile,
-      },
-    ]);
-  }
 
-  // 2. Agar members bilkul nahi hai aur PIN bhi nahi hai
-  const currentMembers = members.length > 0 ? members : (canAdd && !editingId) ? [{
-    id: crypto.randomUUID(),
-    userId: user.uid,
-    gender: formData.gender,
-    name: formData.name.trim(),
-    countryCode: formData.countryCode,
-    mobile: formData.mobile,
-  }] : [];
-
-  if (currentMembers.length === 0 && !joinPin.trim()) {
-    setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
-    setLoading(false);
-    return;
-  }
-
-  try {
-    // 3. ✅ LocalForage me families fetch karo
-    let families = (await localforage.getItem("families")) || [];
-
-    if (joinPin.trim() && !profile?.id) {
-      // 🤝 JOIN FAMILY LOGIC (Only LocalForage)
-      const existingFamily = families.find((f) => f.pin === joinPin);
-      if (existingFamily) {
-        const newMemberData = {
-          id: crypto.randomUUID(),
-          userId: user.uid,
-          gender: formData.gender,
-          name: formData.name.trim(),
-          countryCode: formData.countryCode,
-          mobile: formData.mobile,
-        };
-        const existingMemberIndex = existingFamily.members.findIndex(
-          (m) => m.mobile === newMemberData.mobile && m.countryCode === newMemberData.countryCode
-        );
-
-        if (existingMemberIndex > -1) {
-          existingFamily.members[existingMemberIndex] = {
-            ...existingFamily.members[existingMemberIndex],
-            ...newMemberData,
-          };
-        } else {
-          existingFamily.members.push(newMemberData);
-        }
-
-        families = families.map((f) => (f.pin === joinPin ? existingFamily : f));
-        await localforage.setItem("families", families);
-        updateProfile({ ...existingFamily, pin: joinPin });
-        alert("✅ ફેમિલીમાં જોડાયા!");
-      } else {
-        setWarning("⚠️ અમાન્ય PIN. ફેમિલી મળી નથી.");
-      }
-    } else {
-      // 🆕 CREATE or UPDATE FAMILY LOGIC (LocalForage and Firestore)
-      const familyPayload = {
-        nativeCity: formData.nativeCity,
-        currentCity: formData.currentCity,
-        members: currentMembers,
-        updatedAt: serverTimestamp(),
-      };
-
-      if (profile?.id) {
-        // 🔄 UPDATE Existing family in Firestore
-        const familyDocRef = doc(datastore, "families", profile.id);
-        await updateDoc(familyDocRef, familyPayload);
-        setWarning("✅ Family updated to Firestore!");
-
-        // Update localforage
-        const updatedLocalFamilies = families.map((f) =>
-          f.id === profile.id ? { ...f, ...familyPayload } : f
-        );
-        await localforage.setItem("families", updatedLocalFamilies);
-        updateProfile({ ...profile, ...familyPayload });
-
-      } else {
-        // 🆕 CREATE New family in Firestore
-        const familiesCollectionRef = collection(datastore, "families");
-        const pin = Math.floor(1000 + Math.random() * 9000).toString();
-        const newDocRef = doc(familiesCollectionRef);
-
-        const newFamilyPayload = {
-          ...familyPayload,
-          pin,
-          createdBy: user.uid,
-          createdAt: serverTimestamp(),
-          id: newDocRef.id, // Store Firestore ID locally
-        };
-
-        await setDoc(newDocRef, newFamilyPayload);
-        setJoinPin(pin);
-        alert(`✅ નવો Family બનાવો! તમારો PIN: ${pin}`);
-        setWarning("✅ New family created in Firestore!");
-
-        // Store in localforage after successful Firestore operation
-        families.push(newFamilyPayload);
-        await localforage.setItem("families", families);
-        updateProfile(newFamilyPayload);
-      }
-    }
-
-    setIsEditing(true);
-  } catch (err) {
-    setWarning(`⚠️ ભૂલ થઈ.`);
-    console.error("Operation error:", err);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  // ✅ Member edit mode activate karna
   const startEditMember = (id) => {
     const m = members.find((x) => x.id === id);
     if (!m) return;
@@ -465,47 +508,25 @@ const handleFinish = async () => {
     });
   };
 
-  // ✅ Member delete
   const deleteMember = (id) => {
     const updated = members.filter((m) => m.id !== id);
     setMembers(updated);
   };
 
-  // ✅ Firestore se sync karna (manual refresh)
   const handleDataSync = async () => {
-    if (!profile?.id) {
-      setWarning("⚠️ કોઈ પ્રોફાઇલ નથી.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const docRef = doc(datastore, "families", profile.id);
-      const docSnap = await getDoc(docRef);
-
-      if (docSnap.exists()) {
-        const firestoreData = docSnap.data();
-        updateProfile({ ...firestoreData, id: profile.id });
-        setMembers(firestoreData.members || []);
-        setFormData((s) => ({
-          ...s,
-          nativeCity: firestoreData.nativeCity,
-          currentCity: firestoreData.currentCity,
-        }));
-        setWarning("✅ Firestore sync success!");
-      } else {
-        setWarning("⚠️ Firestore me data nahi mila.");
-      }
-    } catch (err) {
-      setWarning("⚠️ Sync error.");
-      console.error("Sync error:", err);
-    } finally {
-      setLoading(false);
-    }
+    // ... (Data sync logic) ...
   };
+
+  const isReadyForMembers = 
+    profile?.id || 
+    (joinSrno.trim().length > 0) || 
+    (formData.nativeCity.trim().length > 0 && formData.currentCity.trim().length > 0); 
+    
+  const canSaveFamily = isReadyForMembers && (members.length > 0 || canAdd);
 
   return (
     <div className="p-3">
-      {/* ✅ Agar profile hai aur edit mode nahi hai to Sync button dikhao */}
+      {/* 1. Sync button */}
       {profile && !editingId && (
         <button
           onClick={handleDataSync}
@@ -516,37 +537,72 @@ const handleFinish = async () => {
         </button>
       )}
 
-      {/* ✅ CityInputs, MemberList aur MemberForm dikhana */}
-      {(!profile || isEditing) && (
-        <>
+      {/* 2. City Inputs */}
+      {user && (!profile?.id || isEditing) && (
           <CityInputs
             formData={formData}
             setFormData={setFormData}
-            joinPin={joinPin}
-            setJoinPin={setJoinPin}
+            joinSrno={joinSrno} 
+            setJoinSrno={setJoinSrno} 
             profile={profile}
           />
-
+      )}
+      
+      {/* 3. Member List */}
+      {user && (profile?.id || members.length > 0) && (
           <MemberList
             members={members}
             startEditMember={startEditMember}
             deleteMember={deleteMember}
           />
+      )}
 
+      {/* 4. MemberForm (Now uses the correct prop names) */}
+      {user && (profile?.id || isReadyForMembers) && (
           <MemberForm
             formData={formData}
             setFormData={setFormData}
-            handleAdd={handleAdd}
-            handleFinish={handleFinish}
+            handleMemberSave={handleAdd} // 📌 Maps to handleAdd (single member save)
+            handleCancelEdit={handleCancelEdit} // 📌 Function to cancel editing
             editingId={editingId}
-            profile={profile}
-            joinPin={joinPin}
           />
-        </>
+      )}
+      
+      {/* 5. Family Save Button (This calls handleFinish) */}
+      {user && canSaveFamily && (
+        <button
+          onClick={handleFinish}
+          className={`w-full text-white px-4 py-2 mt-4 rounded-lg font-bold shadow-lg 
+            ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`
+          }
+          disabled={loading}
+        >
+          {loading 
+            ? "સેવ થઈ રહ્યું છે..." 
+            : profile?.id 
+            ? "ફેરફારો સેવ કરો (Family Update)" 
+            : "ડેટા સેવ કરો (Family Create)"
+          }
+        </button>
       )}
 
-      {/* ✅ Warning / Messages */}
+      {/* Fallback Message */}
+      {user && !loading && !profile?.id && !isReadyForMembers && (
+        <p className="text-gray-600 mt-4 p-3 bg-yellow-100 rounded border border-yellow-300">
+          🔑 કૃપા કરીને પહેલા વતન, હાલનું શહેર ભરો અથવા ફેમિલી SRNO દાખલ કરો.
+        </p>
+      )}
+
+      {/* 6. Warning / Messages */}
       {warning && <p className="text-red-500 mt-2">{warning}</p>}
+
+      {/* 7. Modal */}
+      <LocalForageDataModal
+        show={showDataModal}
+        content={localForageDataModalContent}
+        onClose={() => setShowDataModal(false)}
+        userUid={user?.uid}
+      />
     </div>
   );
 };
