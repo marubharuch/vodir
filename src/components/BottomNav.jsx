@@ -15,14 +15,14 @@ const BottomNav = () => {
         <FaHome size={28} />
         <span className="text-xs">Home</span>
       </Link>
-      <Link to="/housie" className="flex flex-col items-center text-gray-700 hover:text-gray-500">
+    {/*  <Link to="/housie" className="flex flex-col items-center text-gray-700 hover:text-gray-500">
         <FaPlusCircle size={28} />
         <span className="text-xs">Housie</span>
       </Link>
       <Link to="/housieadmin" className="flex flex-col items-center text-gray-700 hover:text-gray-500">
         <FaCommentDots size={28} />
         <span className="text-xs">Admin</span>
-      </Link>
+      </Link>*/}
       <Link to="/voice" className="flex flex-col items-center text-gray-700 hover:text-gray-500">
         <FaSearch size={28} />
         <span className="text-xs">Families</span>

@@ -137,7 +137,6 @@ const MemberForm = ({
 };
 
 // 🆕 NEW COMPONENT: FamilySummaryView (View Mode for Registered Users)
-// 🛑 FIX: This component definition was missing in the previous pasted code.
 const FamilySummaryView = ({ profile, members, enterEditMode, loading, isUserNonPendingEditor }) => {
     if (!profile || !profile.id) return null;
 
@@ -226,7 +225,6 @@ const CombinedForm = () => {
 
   // 📌 Derived States
   const isJoinMode = joinSrno.trim().length > 0 && !profile?.id;
-  // 🛑 FIX: isViewMode logic
   const isViewMode = profile?.id && !isEditing && !isJoinMode; 
   const isUserNonPendingEditor = profile?.id && members.some(
       m => m.userId === user?.uid && m.pending !== true
@@ -418,7 +416,7 @@ const CombinedForm = () => {
         mobile: "",
       }));
       setWarning("");
-      // When canceling editing, switch back to View Mode if a profile exists
+      // 🚀 CRITICAL FIX: Switch back to View Mode if a profile exists (as requested)
       if (profile?.id) {
           setIsEditing(false);
       }
@@ -528,7 +526,56 @@ const CombinedForm = () => {
 
         // 🤝 JOIN FAMILY LOGIC (Firestore/RTDB Index Update)
         if (isJoining) {
-            // ... (Join Logic is the same) ...
+            console.log("FLOW: Entering JOIN Family Logic. SRNO:", joinSrno);
+            const srnoToJoin = joinSrno.trim();
+            const existingFamilyRef = doc(familiesRef, srnoToJoin);
+            const existingFamilyDoc = await getDoc(existingFamilyRef);
+
+            if (existingFamilyDoc.exists()) {
+                const existingFamilyData = existingFamilyDoc.data();
+                familyIdToSave = existingFamilyDoc.id; 
+                
+                const currentUserData = finalMembersToSave.find(m => m.userId === user.uid) || finalMembersToSave[0];
+                if (!currentUserData) throw new Error("Current user data missing from members list.");
+
+                let matchFound = false;
+                let updatedMembers = existingFamilyData.members.map(m => {
+                    if (m.mobile === currentUserData.mobile && m.countryCode === currentUserData.countryCode) {
+                        matchFound = true;
+                        return { 
+                            ...m, 
+                            userId: user.uid,
+                            pending: true, // Joining members are always pending initially
+                        }; 
+                    }
+                    return m;
+                });
+                
+                if (!matchFound) {
+                     updatedMembers.push({ 
+                        ...currentUserData, 
+                        userId: user.uid,
+                        pending: true, // Joining members are always pending initially
+                     });
+                } else {
+                    finalMembersToSave = updatedMembers;
+                }
+
+                finalFamilyPayload = {
+                    ...existingFamilyData,
+                    members: finalMembersToSave,
+                    updatedAt: serverTimestamp(),
+                };
+                
+                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); // 👈 FIREBASE WRITE
+                await set(userIndexRef, familyIdToSave); // 👈 RTDB WRITE (Index)
+                successMessage = `✅ Family ${familyIdToSave} joined! Your request is pending approval.`;
+
+            } else {
+                setWarning(`⚠️ Invalid Family ID (SRNO): ${srnoToJoin}. Family not found in Firestore.`);
+                setLoading(false);
+                return;
+            }
         } 
         // 🆕 CREATE or 🔄 UPDATE LOGIC
         else {
@@ -591,7 +638,7 @@ const CombinedForm = () => {
         
         await updateProfile(localDataToSave); // Saves to state and localforage
         setMembers(finalMembersToSave); // Sync members state
-        setIsEditing(false); // 🛑 FIX: Switch back to View Mode after successful save
+        setIsEditing(false); // Switch back to View Mode after successful save
         
         if (successMessage) {
             alert(successMessage);
@@ -661,6 +708,18 @@ const CombinedForm = () => {
             profile={profile}
           />
           
+          {/* 🛑 NEW: Cancel Edit Button (Appears when in Edit Mode for an existing family) */}
+          {profile?.id && isEditing && (
+              <div className="flex justify-end mt-4">
+                  <button 
+                      onClick={handleCancelEdit} 
+                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 font-semibold"
+                  >
+                      ❌ Cancel Edit & View Summary
+                  </button>
+              </div>
+          )}
+          
           {/* Member List */}
           {(profile?.id || members.length > 0) && (
               <MemberList
@@ -703,12 +762,7 @@ const CombinedForm = () => {
             </button>
           )}
 
-          {/* Fallback Message */}
-          {!loading && !profile?.id && !isReadyForMembers && (
-            <p className="text-gray-600 mt-4 p-3 bg-yellow-100 rounded border border-yellow-300">
-              🔑 કૃપા કરીને પહેલા વતન, હાલનું શહેર ભરો અથવા ફેમિલી SRNO દાખલ કરો.
-            </p>
-          )}
+          {/* 🛑 REMOVED: The Fallback Message was removed as requested. */}
         </>
       )}
 

@@ -1,4 +1,4 @@
-// src/components/MemberList.jsx (Update this file)
+// src/components/MemberList.jsx (CRITICAL UPDATE)
 
 import React from "react";
 
@@ -6,9 +6,9 @@ const MemberList = ({
     members, 
     startEditMember, 
     deleteMember,
-    // 🆕 New props
     toggleMemberPendingStatus, 
     isUserNonPendingEditor,
+    isEditMode = true,
 }) => {
     return (
         <div className="mt-4 p-3 border rounded-lg bg-white shadow-md">
@@ -29,13 +29,14 @@ const MemberList = ({
                             ({member.countryCode} {member.mobile})
                         </span>
                         
-                        {/* 📌 PENDING STATUS BUTTON/LABEL */}
+                        {/* 📌 PENDING STATUS BUTTON/LABEL (Only show if member.pending is TRUE) */}
                         {member.pending && (
                             <button
-                                onClick={() => toggleMemberPendingStatus(member.id, member.pending)}
-                                disabled={!isUserNonPendingEditor} // Disable if current user isn't an admin
+                                // Use a simple label if not in edit mode (like in FamilySummaryView)
+                                disabled={!isEditMode || !isUserNonPendingEditor} 
+                                onClick={() => isEditMode && isUserNonPendingEditor && toggleMemberPendingStatus(member.id, member.pending)}
                                 className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full 
-                                    ${isUserNonPendingEditor ? 'bg-red-500 hover:bg-red-600 cursor-pointer' : 'bg-red-400 cursor-not-allowed'} 
+                                    ${(isEditMode && isUserNonPendingEditor) ? 'bg-red-500 hover:bg-red-600 cursor-pointer' : 'bg-red-400 cursor-default'} 
                                     text-white transition duration-150`}
                                 title={isUserNonPendingEditor ? "Click to Approve/Verify" : "Pending approval from a verified family member."}
                             >
@@ -43,34 +44,28 @@ const MemberList = ({
                             </button>
                         )}
                         
-                        {/* 📌 OPTIONAL: Button to mark as pending again (for non-pending members) */}
-                        {!member.pending && isUserNonPendingEditor && (
-                             <button
-                                onClick={() => toggleMemberPendingStatus(member.id, member.pending)}
-                                className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-500 hover:bg-yellow-600 text-white transition duration-150"
-                                title="Click to Mark as Pending"
-                            >
-                                ✅ Approved
-                            </button>
-                        )}
+                        {/* 🛑 REMOVED: The logic for showing the "Approved" button is removed, 
+                             as requested. If member.pending is false, nothing is displayed here. */}
 
                     </span>
                     
-                    {/* Edit/Delete Buttons */}
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => startEditMember(member.id)} 
-                            className="bg-yellow-500 text-white px-2 py-1 rounded text-sm hover:bg-yellow-600"
-                        >
-                            ✏️
-                        </button>
-                        <button 
-                            onClick={() => deleteMember(member.id)} 
-                            className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
-                        >
-                            🗑️
-                        </button>
-                    </div>
+                    {/* Edit/Delete Buttons are ONLY visible if isEditMode is true */}
+                    {isEditMode && ( 
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => startEditMember(member.id)} 
+                                className="bg-yellow-500 text-white px-2 py-1 rounded text-sm hover:bg-yellow-600"
+                            >
+                                ✏️
+                            </button>
+                            <button 
+                                onClick={() => deleteMember(member.id)} 
+                                className="bg-red-500 text-white px-2 py-1 rounded text-sm hover:bg-red-600"
+                            >
+                                🗑️
+                            </button>
+                        </div>
+                    )}
                 </div>
             ))}
         </div>
