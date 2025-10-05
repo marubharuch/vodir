@@ -11,7 +11,7 @@ const FamilySummaryView = ({ profile, members, enterEditMode, loading }) => {
 
     return (
         <div className="p-4 border rounded-lg shadow-lg bg-white">
-            <h2 className="text-2xl font-bold mb-4 text-indigo-700">🏠 ફેમિલી સારાંશ (Family Summary)</h2>
+            <h2 className="text-2xl font-bold mb-4 text-indigo-700">🏠 ફેમિલી(Family)</h2>
             
             {/* --- Family Details --- */}
             <div className="mb-4 space-y-2 text-gray-700 border-b pb-4">
@@ -34,7 +34,7 @@ const FamilySummaryView = ({ profile, members, enterEditMode, loading }) => {
                     }
                 >
                     <span className="text-gray-800">
-                        {member.gender}: <strong>{member.name}</strong> ({member.countryCode} {member.mobile})
+                        {/*member.gender*/}: <strong>{member.name}</strong> ({member.countryCode} {member.mobile})
                         {member.pending && (
                             <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white">
                                 ⏳ Pending
