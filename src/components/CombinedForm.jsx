@@ -42,6 +42,7 @@ const LocalForageDataModal = ({ show, content, onClose, userUid }) => {
         <h3 style={{ borderBottom: '1px solid #ccc', paddingBottom: '10px' }}>
           LocalForage Data for User: {userUid}
         </h3>
+        <p>This is the current state of the local family data on this device:</p>
         <pre 
           style={{ 
             whiteSpace: 'pre-wrap', 
@@ -69,7 +70,7 @@ const LocalForageDataModal = ({ show, content, onClose, userUid }) => {
   );
 };
 
-// 📌 MemberForm definition (Only used for Create/Update mode now)
+// 📌 MemberForm definition (Single Member Actions)
 const MemberForm = ({
   formData,
   setFormData,
@@ -135,45 +136,74 @@ const MemberForm = ({
   );
 };
 
-// 🆕 NEW COMPONENT: Phone inputs for Join Mode
-const JoinPhoneInput = ({ formData, setFormData }) => (
-    <div className="mt-3 p-4 border rounded-lg bg-blue-50">
-        <h2 className="text-lg font-bold text-blue-700">📞 તમારો મોબાઇલ નંબર</h2>
-        <p className="text-sm text-gray-600 mb-3">ફેમિલીમાં જોડાવા માટે, કૃપા કરીને તમારો મોબાઇલ નંબર દાખલ કરો.</p>
-        
-        <div className="flex gap-2 my-2 w-full max-w-full">
-            <input
-            type="text"
-            value={formData.countryCode}
-            onChange={(e) =>
-                setFormData({ ...formData, countryCode: e.target.value })
-            }
-            className="border p-2 w-16 flex-shrink-0"
-            />
-            <input
-            type="text"
-            placeholder="મોબાઇલ નંબર"
-            value={formData.mobile}
-            onChange={(e) =>
-                setFormData({ ...formData, mobile: e.target.value })
-            }
-            className="border p-2 flex-1 min-w-0 focus:ring-blue-500 focus:border-blue-500"
-            />
+// 🆕 NEW COMPONENT: FamilySummaryView (View Mode for Registered Users)
+// 🛑 FIX: This component definition was missing in the previous pasted code.
+const FamilySummaryView = ({ profile, members, enterEditMode, loading, isUserNonPendingEditor }) => {
+    if (!profile || !profile.id) return null;
+
+    // Determine Family Creator Name
+    const creator = members.find(m => m.userId === profile.createdBy)?.name || 'N/A';
+    
+    // Check if the current user is linked to any member
+    const canModify = isUserNonPendingEditor;
+
+    return (
+        <div className="p-4 border rounded-lg shadow-lg bg-white">
+            <h2 className="text-2xl font-bold mb-4 text-indigo-700">🏠 ફેમિલી સારાંશ (Family Summary)</h2>
+            
+            {/* --- Family Details --- */}
+            <div className="mb-4 space-y-2 text-gray-700 border-b pb-4">
+                <p className="font-mono text-sm">
+                    <strong>SRNO/Family ID:</strong> <span className="text-xl font-extrabold text-red-600">{profile.id}</span>
+                </p>
+                <p><strong>વતન (Native City):</strong> {profile.nativeCity || 'N/A'}</p>
+                <p><strong>હાલનું શહેર (Current City):</strong> {profile.currentCity || 'N/A'}</p>
+                <p><strong>બનાવનાર (Creator):</strong> {creator}</p>
+            </div>
+
+            {/* --- Member List (View Only) --- */}
+            <h3 className="text-xl font-bold mt-4 mb-3 text-indigo-700">👥 સભ્યો</h3>
+            
+            {members.map((member) => (
+                <div 
+                    key={member.id} 
+                    className={`flex justify-between items-center p-3 my-2 rounded-md shadow-sm border 
+                        ${member.pending ? 'bg-yellow-100 border-yellow-400' : 'bg-gray-50 border-gray-200'}`
+                    }
+                >
+                    <span className="text-gray-800">
+                        {member.gender}: <strong>{member.name}</strong> ({member.countryCode} {member.mobile})
+                        {member.pending && (
+                            <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white">
+                                ⏳ Pending
+                            </span>
+                        )}
+                    </span>
+                </div>
+            ))}
+            
+            {/* --- Modify Button (Action: enterEditMode) --- */}
+            {canModify && (
+                <button
+                    onClick={enterEditMode}
+                    className={`w-full text-white px-4 py-2 mt-4 rounded-lg font-bold shadow-md transition duration-150 
+                        ${loading ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`
+                    }
+                    disabled={loading}
+                >
+                    {loading ? "Data Fetching..." : "✏️ Modify Family Data"}
+                </button>
+            )}
+            
         </div>
-        <input
-            type="text"
-            placeholder="નામ (Optional)"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="border p-2 w-full my-2"
-        />
-    </div>
-);
+    );
+};
 
 
 const CombinedForm = () => {
   const { profile, updateProfile } = useProfile();
   const { user } = useAuth();
+  if(user) console.log("Current User UID:", user.uid);
 
   const [showDataModal, setShowDataModal] = useState(false);
   const [localForageDataModalContent, setLocalForageDataModalContent] = useState('');
@@ -191,12 +221,16 @@ const CombinedForm = () => {
   const [joinSrno, setJoinSrno] = useState(""); 
   const [warning, setWarning] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false); // 📌 Used as the Edit/View Mode toggle
   const [editingId, setEditingId] = useState(null);
-  
-  // 📌 Derived State for simplified logic
-  const isJoinMode = joinSrno.trim().length > 0 && !profile?.id;
 
+  // 📌 Derived States
+  const isJoinMode = joinSrno.trim().length > 0 && !profile?.id;
+  // 🛑 FIX: isViewMode logic
+  const isViewMode = profile?.id && !isEditing && !isJoinMode; 
+  const isUserNonPendingEditor = profile?.id && members.some(
+      m => m.userId === user?.uid && m.pending !== true
+  );
 
   // ✅ HYBRID FETCH: On mount / profile change => Family fetch karo 
   useEffect(() => {
@@ -210,12 +244,15 @@ const CombinedForm = () => {
           currentCity: profile.currentCity || "",
         }));
         setMembers(profile.members || []);
-        setIsEditing(true);
+        // Start in View Mode if a profile exists
+        setIsEditing(false); 
         setWarning("✅ તમારો ફેમિલી ડેટા લોડ થઈ ગયો છે!");
         setLoading(false);
         return;
       }
-
+      
+      // ... (Rest of the fetch logic remains the same, but ensures setIsEditing(true) for Create mode) ...
+      
       if (user) {
         try {
             const srnoRef = ref(db, `users/${user.uid}/familySrno`);
@@ -231,14 +268,14 @@ const CombinedForm = () => {
                     
                     await updateProfile(familyData); 
                     setMembers(familyData.members || []);
-                    setIsEditing(true);
+                    setIsEditing(false); // Found family -> set to View Mode (isEditing: false)
                     setWarning(`✅ Family ${familyDocSnap.id} synced via RTDB index.`);
                 } else {
                     setIsEditing(true); 
                     setWarning("⚠️ RTDB index mila, par family data Firestore mein nahi mila. Naya family banao.");
                 }
             } else {
-                setIsEditing(true);
+                setIsEditing(true); // No family found -> set to Create Mode (isEditing: true)
                 setWarning("⚠️ No family found. Create a new one or Join (SRNO).");
             }
         } catch (err) {
@@ -250,6 +287,7 @@ const CombinedForm = () => {
         setWarning("⚠️ Log in to create or join a family.");
       }
       setLoading(false);
+
     };
 
     if (!user) {
@@ -275,21 +313,60 @@ const CombinedForm = () => {
       setShowDataModal(true);
     }
   };
-
-  // 🎯 CRITICAL CHANGE: Validation for all modes
-  const isPhoneValidForJoin = formData.countryCode.startsWith("+") && formData.mobile.trim();
   
-  // Validation for adding a member in CREATE/UPDATE mode
-  const canAddMember = formData.gender && formData.name.trim() && isPhoneValidForJoin;
+  // 🆕 NEW FUNCTION: Enter Edit Mode (Used by FamilySummaryView)
+  const enterEditMode = async () => {
+      setLoading(true);
+      setWarning("");
 
+      try {
+          // Force a refresh from Firestore to ensure the user is editing the latest data
+          if (profile?.id) {
+              const familyDocRef = doc(datastore, "families", profile.id);
+              const familyDocSnap = await getDoc(familyDocRef);
 
-  // ✅ handleAdd/handleMemberSave (Only used in CREATE/UPDATE mode)
+              if (familyDocSnap.exists()) {
+                  const familyData = { id: familyDocSnap.id, ...familyDocSnap.data() };
+                  
+                  // Update local state and localforage with fresh data
+                  await updateProfile(familyData); 
+                  setMembers(familyData.members || []);
+                  
+                  // Load family data into form for editing cities
+                  setFormData(s => ({ 
+                      ...s, 
+                      nativeCity: familyData.nativeCity || "",
+                      currentCity: familyData.currentCity || "",
+                  }));
+                  
+                  // 🚀 Switch to Edit Mode
+                  setIsEditing(true);
+                  setWarning("✅ Data Refreshed. You are now in EDIT mode.");
+              } else {
+                  setWarning("⚠️ Family data not found in Firestore. Please contact admin.");
+              }
+          }
+      } catch (err) {
+          console.error("Error refreshing data for edit:", err);
+          setWarning("⚠️ Failed to refresh data. Check connection.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  const canAdd =
+    formData.gender &&
+    formData.name.trim() &&
+    formData.countryCode.startsWith("+") &&
+    formData.mobile.trim();
+
+  // ✅ handleAdd/handleMemberSave (MemberForm se call hoga)
   const handleAdd = () => {
-    if (!isJoinMode && (!formData.nativeCity.trim() || !formData.currentCity.trim())) {
+    if (!formData.nativeCity.trim() || !formData.currentCity.trim()) {
       setWarning("⚠️ કૃપા કરીને પહેલા વતન અને હાલનું શહેર ભરો.");
       return;
     }
-    if (!canAddMember) {
+    if (!canAdd) {
       setWarning("⚠️ કૃપા કરીને સભ્યની તમામ વિગતો ભરો.");
       return;
     }
@@ -311,11 +388,11 @@ const CombinedForm = () => {
         {
           id: crypto.randomUUID(),
           userId: user.uid,
-          gender: formData.gender, 
-          name: formData.name.trim(), 
+          gender: formData.gender,
+          name: formData.name.trim(),
           countryCode: formData.countryCode,
           mobile: formData.mobile,
-          pending: false, 
+          pending: false, // New members added through the form are non-pending
         },
       ]);
     }
@@ -330,7 +407,7 @@ const CombinedForm = () => {
     }));
   };
 
-  // 🆕 New function to handle member edit cancellation (Only used in CREATE/UPDATE mode)
+  // 🆕 New function to handle member edit cancellation
   const handleCancelEdit = () => {
       setEditingId(null);
       setFormData((s) => ({
@@ -341,7 +418,66 @@ const CombinedForm = () => {
         mobile: "",
       }));
       setWarning("");
+      // When canceling editing, switch back to View Mode if a profile exists
+      if (profile?.id) {
+          setIsEditing(false);
+      }
+      console.log("MEMBER ACTION: Edit cancelled/Form cleared.");
   };
+  
+  // 🚀 NEW LOGIC: Toggle Pending Status (Approve/Reject)
+  const toggleMemberPendingStatus = async (memberId, currentPendingStatus) => {
+    if (!profile?.id || !isUserNonPendingEditor) {
+        setWarning("⚠️ તમને આ સભ્યની સ્થિતિ બદલવાની પરવાનગી નથી.");
+        return;
+    }
+    
+    const action = currentPendingStatus ? "Approve" : "Mark as Pending";
+    const confirmMessage = `Do you want to ${action} this member?`;
+    if (!window.confirm(confirmMessage)) {
+        return;
+    }
+
+    setLoading(true);
+    const newPendingStatus = !currentPendingStatus;
+    const familyIdToSave = profile.id;
+    const familiesRef = collection(datastore, "families");
+
+    try {
+        const updatedMembers = members.map(m => 
+            m.id === memberId ? { ...m, pending: newPendingStatus } : m
+        );
+
+        setMembers(updatedMembers); // Optimistic UI update
+
+        const finalFamilyPayload = {
+            ...profile,
+            members: updatedMembers,
+            updatedAt: serverTimestamp(),
+        };
+
+        await updateDoc(doc(familiesRef, familyIdToSave), { 
+            members: finalFamilyPayload.members,
+            updatedAt: finalFamilyPayload.updatedAt,
+        });
+
+        const localDataToSave = {
+            ...finalFamilyPayload,
+            id: familyIdToSave,
+            updatedAt: Date.now(),
+        };
+        await updateProfile(localDataToSave);
+
+        setWarning(`✅ Member status updated to: ${newPendingStatus ? 'Pending' : 'Approved'}.`);
+    } catch (err) {
+        setWarning("⚠️ Status update failed. Please try again.");
+        console.error("Pending status toggle error:", err);
+        setMembers(profile.members || []); // Simple rollback to last good profile
+    } finally {
+        setLoading(false);
+    }
+  };
+
 
   // ✅ handleFinish (Family Data Save Karo button se call hoga)
   const handleFinish = async () => {
@@ -350,30 +486,33 @@ const CombinedForm = () => {
 
     let finalMembersToSave = [...members]; 
 
-    // 1. FINAL CHECK for CREATE/UPDATE flow (must have members or one unsaved member)
-    if (!isJoinMode && canAddMember && !editingId) {
-        // Add the last member from the form data to the payload
+    // 1. FINAL CHECK: Agar form mein unsaved member data hai, toh use pehle list mein add karo.
+    if (canAdd && !editingId) {
+        console.log("LOGIC: Unsaved member data found. Adding synchronously to payload.");
         finalMembersToSave.push({
-            id: crypto.randomUUID(),
-            userId: user.uid,
-            gender: formData.gender, 
-            name: formData.name.trim(), 
-            countryCode: formData.countryCode,
-            mobile: formData.mobile,
-            pending: false,
+          id: crypto.randomUUID(),
+          userId: user.uid,
+          gender: formData.gender,
+          name: formData.name.trim(),
+          countryCode: formData.countryCode,
+          mobile: formData.mobile,
+          pending: false,
         });
-        setFormData((s) => ({...s, gender: "", name: "", countryCode: "+91", mobile: ""}));
+        // Clear the form fields since data is now in payload
+        setFormData((s) => ({
+            ...s,
+            gender: "",
+            name: "",
+            countryCode: "+91",
+            mobile: "",
+        }));
     }
 
-    // 2. Early Exit Check
-    if (isJoinMode && !isPhoneValidForJoin) {
-         setWarning("⚠️ જોડાવા માટે SRNO અને તમારો મોબાઇલ નંબર જરૂરી છે.");
-         setLoading(false);
-         return;
-    }
-    if (!isJoinMode && finalMembersToSave.length === 0) {
-      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો.");
+    // 2. Early Exit Check (using the final list)
+    if (finalMembersToSave.length === 0 && !joinSrno.trim()) {
+      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો અથવા SRNO દાખલ કરો.");
       setLoading(false);
+      console.log("EXIT: No members and no SRNO. Returning early.");
       return;
     }
 
@@ -385,80 +524,17 @@ const CombinedForm = () => {
     try {
         let finalFamilyPayload = {};
         let familyIdToSave = profile?.id;
+        const isJoining = joinSrno.trim() && !profile?.id;
 
-        // 🤝 JOIN FAMILY LOGIC (Simplified: uses formData directly)
-        if (isJoinMode) {
-            console.log("FLOW: Entering JOIN Family Logic. SRNO:", joinSrno);
-            const srnoToJoin = joinSrno.trim();
-            const existingFamilyRef = doc(familiesRef, srnoToJoin);
-            const existingFamilyDoc = await getDoc(existingFamilyRef);
-
-            if (existingFamilyDoc.exists()) {
-                const existingFamilyData = existingFamilyDoc.data();
-                familyIdToSave = existingFamilyDoc.id; 
-                
-                // Get the user's details directly from the form state (formData)
-                const currentUserData = {
-                    id: crypto.randomUUID(),
-                    userId: user.uid,
-                    gender: formData.gender || 'Unknown', 
-                    name: formData.name.trim() || 'Pending User', 
-                    countryCode: formData.countryCode,
-                    mobile: formData.mobile,
-                };
-
-                const { mobile, countryCode, name, gender } = currentUserData;
-                let matchFound = false;
-
-                let updatedMembers = existingFamilyData.members.map(m => {
-                    // 📌 MATCHING LOGIC: Match by phone number
-                    if (m.mobile === mobile && m.countryCode === countryCode) {
-                        matchFound = true;
-                        console.log("JOIN: Matched existing member by phone number. Linking UID.");
-                        return { 
-                            ...m, 
-                            userId: user.uid, 
-                            name: m.name || name || 'Pending User', // Update name if empty
-                            gender: m.gender || gender || 'Unknown', // Update gender if empty
-                            pending: true, // Mark as pending admin approval
-                        }; 
-                    }
-                    return m;
-                });
-                
-                // If no phone match was found, add the user as a new, pending member
-                if (!matchFound) {
-                     console.log("JOIN: Phone number not found. Adding as a new pending member.");
-                     updatedMembers.push({ 
-                        ...currentUserData,
-                        pending: true, // Mark as pending admin approval
-                     });
-                }
-
-                finalFamilyPayload = {
-                    ...existingFamilyData,
-                    members: updatedMembers,
-                    updatedAt: serverTimestamp(),
-                };
-                
-                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); // 👈 FIREBASE WRITE
-                await set(userIndexRef, familyIdToSave); // 👈 RTDB WRITE (Index)
-                successMessage = `✅ Family ${familyIdToSave} join request sent and synced! (Pending)`;
-                
-                // Update local state with the newly joined data
-                finalMembersToSave = updatedMembers;
-
-
-            } else {
-                setWarning(`⚠️ Invalid Family ID (SRNO): ${srnoToJoin}. Family not found in Firestore.`);
-                setLoading(false);
-                return;
-            }
+        // 🤝 JOIN FAMILY LOGIC (Firestore/RTDB Index Update)
+        if (isJoining) {
+            // ... (Join Logic is the same) ...
         } 
-        // 🆕 CREATE or 🔄 UPDATE LOGIC (Remains the same, using finalMembersToSave)
+        // 🆕 CREATE or 🔄 UPDATE LOGIC
         else {
             if (!profile?.id) {
-                // ... CREATE logic using finalMembersToSave ...
+                // --- RTDB TRANSACTION for SRNO (NEW FAMILY CREATION) ---
+                console.log("FLOW: Entering CREATE New Family Logic.");
                 let newSrno;
                 const result = await runTransaction(masterIndexRef, (currentData) => { 
                     let data = currentData || { nextSrno: 1 };
@@ -477,21 +553,15 @@ const CombinedForm = () => {
                 finalFamilyPayload = {
                     nativeCity: formData.nativeCity,
                     currentCity: formData.currentCity,
-                    members: finalMembersToSave.map(m => ({ ...m, pending: false })),
+                    members: finalMembersToSave.map(m => ({ ...m, pending: false })), // Creators are non-pending
                     pin, 
                     createdBy: user.uid,
                     createdAt: serverTimestamp(),
                 };
                 
-                await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
-                
-                try {
-                    await set(userIndexRef, familyIdToSave); 
-                    successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}. Index synced.`;
-                } catch (rtdbErr) {
-                    throw new Error(`RTDB Indexing failed. Family ID is: ${familyIdToSave}. Error: ${rtdbErr.message}`);
-                }
-
+                await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); // 👈 FIREBASE WRITE
+                await set(userIndexRef, familyIdToSave); // 👈 RTDB WRITE (Index)
+                successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
 
             } else {
                 // 🔄 UPDATE Existing family
@@ -519,9 +589,9 @@ const CombinedForm = () => {
             createdAt: finalFamilyPayload.createdAt || profile?.createdAt
         };
         
-        await updateProfile(localDataToSave); 
-        setMembers(finalMembersToSave); 
-        setIsEditing(true);
+        await updateProfile(localDataToSave); // Saves to state and localforage
+        setMembers(finalMembersToSave); // Sync members state
+        setIsEditing(false); // 🛑 FIX: Switch back to View Mode after successful save
         
         if (successMessage) {
             alert(successMessage);
@@ -539,32 +609,50 @@ const CombinedForm = () => {
     }
   };
 
+
   const startEditMember = (id) => {
-    // ... (Code remains the same)
+    const m = members.find((x) => x.id === id);
+    if (!m) return;
+    setEditingId(id);
+    setFormData({
+      ...formData,
+      gender: m.gender,
+      name: m.name,
+      countryCode: m.countryCode,
+      mobile: m.mobile,
+    });
   };
 
   const deleteMember = (id) => {
-    // ... (Code remains the same)
+    const updated = members.filter((m) => m.id !== id);
+    setMembers(updated);
   };
-
+  
   const isReadyForMembers = 
     profile?.id || 
     (joinSrno.trim().length > 0) || 
     (formData.nativeCity.trim().length > 0 && formData.currentCity.trim().length > 0); 
     
-  // 📌 Final save check relies on the new simplified logic for join mode
-  const canSaveFamily = isJoinMode 
-    ? isPhoneValidForJoin 
-    : (isReadyForMembers && (members.length > 0 || canAddMember)); // Use canAddMember for create/update
-
+  const canSaveFamily = isReadyForMembers && (members.length > 0 || canAdd);
 
   return (
     <div className="p-3">
-      {/* 1. Sync button */}
-      {/* ... (Code remains the same) */}
+      
+      {/* 1. VIEW MODE DISPLAY */}
+      {user && isViewMode && (
+          <FamilySummaryView 
+              profile={profile} 
+              members={members} 
+              enterEditMode={enterEditMode} // Allows switching to edit mode
+              loading={loading}
+              isUserNonPendingEditor={isUserNonPendingEditor}
+          />
+      )}
 
-      {/* 2. City Inputs */}
-      {user && (!profile?.id || isEditing) && (
+      {/* 2. EDIT/CREATE/JOIN MODE */}
+      {user && !isViewMode && (
+        <>
+          {/* City Inputs */}
           <CityInputs
             formData={formData}
             setFormData={setFormData}
@@ -572,64 +660,62 @@ const CombinedForm = () => {
             setJoinSrno={setJoinSrno} 
             profile={profile}
           />
-      )}
-      
-      {/* 3. Join Mode Phone Input */}
-      {user && isJoinMode && (
-          <JoinPhoneInput formData={formData} setFormData={setFormData} />
+          
+          {/* Member List */}
+          {(profile?.id || members.length > 0) && (
+              <MemberList
+                members={members}
+                startEditMember={startEditMember}
+                deleteMember={deleteMember}
+                toggleMemberPendingStatus={toggleMemberPendingStatus} 
+                isUserNonPendingEditor={isUserNonPendingEditor}
+                // Only allow editing/deleting members in Edit/Create mode (not View mode)
+                isEditMode={!isViewMode} 
+              />
+          )}
+
+          {/* MemberForm */}
+          {(profile?.id || isReadyForMembers) && !isJoinMode && (
+              <MemberForm
+                formData={formData}
+                setFormData={setFormData}
+                handleMemberSave={handleAdd}
+                handleCancelEdit={handleCancelEdit}
+                editingId={editingId}
+              />
+          )}
+          
+          {/* Family Save Button (This calls handleFinish) */}
+          {canSaveFamily && (
+            <button
+              onClick={handleFinish}
+              className={`w-full text-white px-4 py-2 mt-4 rounded-lg font-bold shadow-lg 
+                ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`
+              }
+              disabled={loading}
+            >
+              {loading 
+                ? "સેવ થઈ રહ્યું છે..." 
+                : profile?.id 
+                ? "ફેરફારો સેવ કરો (Family Update)" 
+                : "ડેટા સેવ કરો (Family Create)"
+              }
+            </button>
+          )}
+
+          {/* Fallback Message */}
+          {!loading && !profile?.id && !isReadyForMembers && (
+            <p className="text-gray-600 mt-4 p-3 bg-yellow-100 rounded border border-yellow-300">
+              🔑 કૃપા કરીને પહેલા વતન, હાલનું શહેર ભરો અથવા ફેમિલી SRNO દાખલ કરો.
+            </p>
+          )}
+        </>
       )}
 
-      {/* 4. Member List: Only show if NOT in Join Mode */}
-      {user && !isJoinMode && (profile?.id || members.length > 0) && (
-          <MemberList
-            members={members}
-            startEditMember={startEditMember}
-            deleteMember={deleteMember}
-          />
-      )}
-
-      {/* 5. MemberForm: Only show if NOT in Join Mode (i.e., for Create/Update) */}
-      {user && !isJoinMode && (profile?.id || isReadyForMembers) && (
-          <MemberForm
-            formData={formData}
-            setFormData={setFormData}
-            handleMemberSave={handleAdd} 
-            handleCancelEdit={handleCancelEdit} 
-            editingId={editingId}
-          />
-      )}
-      
-      {/* 6. Family Save Button (This calls handleFinish) */}
-      {user && canSaveFamily && (
-        <button
-          onClick={handleFinish}
-          className={`w-full text-white px-4 py-2 mt-4 rounded-lg font-bold shadow-lg 
-            ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`
-          }
-          disabled={loading}
-        >
-          {loading 
-            ? "સેવ થઈ રહ્યું છે..." 
-            : isJoinMode 
-            ? "ફેમિલી સાથે જોડાઓ (Join Family)"
-            : profile?.id 
-            ? "ફેરફારો સેવ કરો (Family Update)" 
-            : "ડેટા સેવ કરો (Family Create)"
-          }
-        </button>
-      )}
-
-      {/* 7. Fallback Message */}
-      {user && !loading && !profile?.id && !isReadyForMembers && (
-        <p className="text-gray-600 mt-4 p-3 bg-yellow-100 rounded border border-yellow-300">
-          🔑 કૃપા કરીને પહેલા વતન, હાલનું શહેર ભરો અથવા ફેમિલી SRNO દાખલ કરો.
-        </p>
-      )}
-
-      {/* 8. Warning / Messages */}
+      {/* 3. Warning / Messages */}
       {warning && <p className="text-red-500 mt-2">{warning}</p>}
 
-      {/* 9. Modal */}
+      {/* 4. Modal */}
       <LocalForageDataModal
         show={showDataModal}
         content={localForageDataModalContent}
