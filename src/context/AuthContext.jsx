@@ -13,6 +13,8 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import localforage from "localforage";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../firebase";
 
 const AuthContext = createContext();
 
@@ -20,6 +22,13 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    setUser(firebaseUser);
+    setLoading(false);
+  });
+  return unsubscribe;
+}, []);
   // App start par localforage se user load karna
   useEffect(() => {
     localforage

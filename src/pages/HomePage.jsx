@@ -64,17 +64,17 @@ const HomePage = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
       {/* --- Top greeting + logout --- */}
-      <div className="p-4 bg-white shadow-md flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-800">
+      <div className="p-2 bg-white shadow-md flex items-center justify-between">
+        <h5 className="text font-semibold  text-gray-800">
           Welcome, {user.displayName || user.email} 🎉
-        </h1>
-        <button
+        </h5>
+       {/* <button
           onClick={logout}
           className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
         >
           Logout
-        </button>
-      </div>
+        </button>*/
+}      </div>
 
       {/* --- Ribbon --- */}
       <CityRibbon />   {/* Remark: Ye component ek city ribbon UI dikhata hai */}
