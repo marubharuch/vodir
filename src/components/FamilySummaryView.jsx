@@ -8,14 +8,17 @@ const FamilySummaryView = ({ profile, members, enterEditMode, loading, isUserNon
 
   return (
     <div className="p-4 border rounded-lg shadow bg-white">
-      <h5 className="text-2xl font-bold mb-4 text-indigo-700">🏠 Family</h5>
-      <div className="mb-4 space-y-2 border-b pb-3 text-gray-700">
+     { /*<h5 className="text-2xl font-bold mb-4 text-indigo-700">🏠 Family</h5>*/}
+      <div className="mb-1 space-y-2 border-b pb-1 text-gray-700">
         <p><strong>ID:</strong> <span className="text-red-600 font-bold">{profile.id}</span></p>
-        <p><strong>વતન:</strong> {profile.nativeCity || 'N/A'}</p>
-        <p><strong>હાલનું શહેર:</strong> {profile.currentCity || 'N/A'}</p>
-        <p><strong>બનાવનાર:</strong> {creator}</p>
+<p>-<strong> {profile.currentCity || 'N/A'}
+(</strong> {profile.nativeCity || 'N/A'}) </p>
+
+        
+        {/*<p><strong>વતન:</strong> {profile.nativeCity || 'N/A'} -<strong>હાલનું શહેર:</strong> {profile.currentCity || 'N/A'}</p>
+       */ }<p><strong>બનાવનાર:</strong> {creator}</p>
       </div>
-      <h3 className="text-xl font-bold text-indigo-700 mb-2">👥 સભ્યો</h3>
+      <h3 className="text- font-bold text-indigo-700 mb-1">👥 MEMBERS</h3>
       {members.map(m => (
         <div key={m.id} className={`p-2 mb-1 border rounded ${m.pending ? "bg-yellow-100" : "bg-gray-50"}`}>
           <strong>{m.name}</strong> ({m.countryCode} {m.mobile})
