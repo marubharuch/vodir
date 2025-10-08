@@ -689,200 +689,219 @@ const CombinedForm = () => {
     
   const canSaveFamily = isReadyForMembers && (members.length > 0 || canAdd);
 
+
   return (
-    <div className="p-3">
-      
-      {/* 1. VIEW MODE DISPLAY */}
-      {user && isViewMode && (
-          <FamilySummaryView 
-              profile={profile} 
-              members={members} 
-              enterEditMode={enterEditMode} 
-              loading={loading}
-              isUserNonPendingEditor={isApprovedEditor} // Use the strong check
-              isUserPending={isUserPending} 
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-4 sm:p-6 space-y-6">
+        {/* View Mode */}
+        {user && isViewMode && (
+          <FamilySummaryView
+            profile={profile}
+            members={members}
+            enterEditMode={enterEditMode}
+            loading={loading}
+            isUserNonPendingEditor={isApprovedEditor}
+            isUserPending={isUserPending}
           />
-      )}
-      
-      {/* 2. INITIAL CHOICE SCREEN (New Block) */}
-      {user && !profile?.id && selectedMode === null && !loading && (
-          <div className="mt-8 p-6 bg-white rounded-lg shadow-xl text-center">
-              <h2 className="text-xl font-bold mb-6 text-gray-800">તમે શું કરવા માંગો છો?</h2>
-              <div className="flex justify-around space-x-4">
-                  <button 
-                      onClick={() => { setSelectedMode('join'); setIsEditing(true); }} 
-                      className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg shadow-md hover:bg-blue-700 transition duration-150 font-semibold"
-                  >
-                      🤝 ફેમિલી જોઈન કરો
-                  </button>
-                  <button 
-                      onClick={() => { setSelectedMode('create'); setIsEditing(true); }} 
-                      className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg shadow-md hover:bg-indigo-700 transition duration-150 font-semibold"
-                  >
-                      🆕 નવું ફેમિલી બનાવો
-                  </button>
-              </div>
+        )}
+
+        {/* Choice Screen */}
+        {user && !profile?.id && selectedMode === null && !loading && (
+          <div className="text-center space-y-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              તમે શું કરવા માંગો છો?
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  setSelectedMode("join");
+                  setIsEditing(true);
+                }}
+                className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-blue-700"
+              >
+                🤝 ફેમિલી જોઈન કરો
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedMode("create");
+                  setIsEditing(true);
+                }}
+                className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-indigo-700"
+              >
+                🆕 નવું ફેમિલી બનાવો
+              </button>
+            </div>
           </div>
-      )}
+        )}
 
-
-      {/* 3. PENDING EDITOR REQUESTS SECTION */}
-      {profile?.id && isApprovedEditor && Array.isArray(profile.pendingEditorEmails) && profile.pendingEditorEmails.length > 0 && (
-          <div className="mt-6 p-4 border border-blue-400 bg-blue-50 rounded-lg shadow-inner">
-              <h3 className="text-lg font-bold text-blue-700 mb-3">
-                  🖊️ Pending Editor Requests ({profile.pendingEditorEmails.length})
+        {/* Pending Editor Requests */}
+        {profile?.id &&
+          isApprovedEditor &&
+          Array.isArray(profile.pendingEditorEmails) &&
+          profile.pendingEditorEmails.length > 0 && (
+            <div className="p-4 border border-blue-300 bg-blue-50 rounded-xl">
+              <h3 className="text-lg font-semibold text-blue-700 mb-2">
+                🖊️ Pending Editor Requests
               </h3>
               <ul className="space-y-2">
-                  {profile.pendingEditorEmails.map((email) => (
-                      <li key={email} className="flex justify-between items-center p-2 bg-white border rounded">
-                          <span className="font-medium text-gray-700">{email}</span>
-                          <button
-                              onClick={() => approveEditorRequest(email)}
-                              className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 disabled:bg-gray-400"
-                              disabled={loading}
-                          >
-                              Approve
-                          </button>
-                      </li>
-                  ))}
+                {profile.pendingEditorEmails.map((email) => (
+                  <li
+                    key={email}
+                    className="flex justify-between items-center bg-white border rounded-md p-2"
+                  >
+                    <span className="text-gray-700 text-sm sm:text-base">{email}</span>
+                    <button
+                      onClick={() => approveEditorRequest(email)}
+                      className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 disabled:bg-gray-400"
+                      disabled={loading}
+                    >
+                      Approve
+                    </button>
+                  </li>
+                ))}
               </ul>
-          </div>
-      )}
-
-
-      {/* 4. EDIT/CREATE/JOIN MODE */}
-      {/* Show form content if we are editing OR (creating AND selectedMode is create) OR (joining) */}
-      {user && !isViewMode && !(isUserPending && !isLinkingMode) && (selectedMode === 'create' || isJoinMode) && (
-        <>
-          {/* City Inputs - 🛑 CONDITIONALLY RENDER */}
-          {/* Show City Inputs ONLY IF in CREATE mode (and not in Edit mode of existing family) */}
-          {!profile?.id && selectedMode === 'create' && (
-              <CityInputs
-                formData={formData}
-                setFormData={setFormData}
-                joinSrno={joinSrno} 
-                setJoinSrno={setJoinSrno} 
-                profile={profile}
-              />
+            </div>
           )}
-          
-          {/* 🛑 JOIN MODE INPUTS (SRNO + Mobile) */}
-          {isJoinMode && !profile?.id && (
-              <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h3 className="font-bold text-yellow-800 mb-2">ફેમિલી જોઈન કરો</h3>
-                  {/* SRNO Input */}
-                  <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-700">ફેમિલી SRNO</label>
-                      <input 
-                          type="text" 
-                          value={joinSrno} 
-                          onChange={(e) => setJoinSrno(e.target.value)} 
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
-                          placeholder="દા.ત. 1001"
-                          disabled={shouldSkipCityInputs} // Disable if pre-filled by RTDB
-                      />
-                  </div>
-                  {/* Mobile Input */}
-                  <MemberForm
+
+        {/* Edit / Create / Join Mode */}
+        {user &&
+          !isViewMode &&
+          !(isUserPending && !isLinkingMode) &&
+          (selectedMode === "create" || isJoinMode) && (
+            <div className="space-y-6">
+              {/* City Inputs */}
+              {!profile?.id && selectedMode === "create" && (
+                <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                  <CityInputs
                     formData={formData}
                     setFormData={setFormData}
-                    // Only show the mobile fields in join mode
-                    isJoinMode={true} 
+                    joinSrno={joinSrno}
+                    setJoinSrno={setJoinSrno}
+                    profile={profile}
                   />
-                  
-                  {/* Cancel/Go Back Button for Join Mode */}
+                </div>
+              )}
+
+              {/* Join Mode Inputs */}
+              {isJoinMode && !profile?.id && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl space-y-4">
+                  <h3 className="font-bold text-yellow-800 text-lg">ફેમિલી જોઈન કરો</h3>
+                  <div className="space-y-3 max-w-md mx-auto">
+                    <label className="block text-sm font-medium text-gray-700">
+                      ફેમિલી SRNO
+                    </label>
+                    <input
+                      type="text"
+                      value={joinSrno}
+                      onChange={(e) => setJoinSrno(e.target.value)}
+                      className="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-yellow-400"
+                      placeholder="દા.ત. 1001"
+                      disabled={shouldSkipCityInputs}
+                    />
+                  </div>
+                  <MemberForm formData={formData} setFormData={setFormData} isJoinMode={true} />
                   {!shouldSkipCityInputs && (
-                      <div className="mt-4">
-                           <button 
-                              onClick={handleCancelEdit} // Use handleCancelEdit to reset to choice screen
-                              className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 font-semibold"
-                          >
-                              ❌ Cancel & Go Back
-                          </button>
-                      </div>
+                    <div className="text-center">
+                      <button
+                        onClick={handleCancelEdit}
+                        className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600"
+                      >
+                        ❌ Cancel & Go Back
+                      </button>
+                    </div>
                   )}
+                </div>
+              )}
 
-              </div>
-          )}
-          
-          {/* 🛑 NEW: Cancel Edit Button (Only visible if editing an existing profile) */}
-          {profile?.id && isEditing && (
-              <div className="flex justify-end mt-4">
-                  <button 
-                      onClick={handleCancelEdit} 
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 font-semibold"
+              {/* Cancel Edit Button */}
+              {profile?.id && isEditing && (
+                <div className="text-right">
+                  <button
+                    onClick={handleCancelEdit}
+                    className="bg-red-500 text-white px-4 py-2 rounded-md font-semibold hover:bg-red-600"
                   >
-                      ❌ Cancel Edit & View Summary
+                    ❌ Cancel Edit & View Summary
                   </button>
-              </div>
-          )}
-          
-          {/* Member List */}
-          {(profile?.id || members.length > 0) && (
-              <MemberList
-                members={members}
-                startEditMember={startEditMember}
-                deleteMember={deleteMember}
-                toggleMemberPendingStatus={toggleMemberPendingStatus} 
-                isUserNonPendingEditor={isApprovedEditor}
-                isEditMode={!isViewMode} 
-              />
+                </div>
+              )}
+
+              {/* Member List */}
+              {(profile?.id || members.length > 0) && (
+                <div className="overflow-x-auto">
+                  <MemberList
+                    members={members}
+                    startEditMember={startEditMember}
+                    deleteMember={deleteMember}
+                    toggleMemberPendingStatus={toggleMemberPendingStatus}
+                    isUserNonPendingEditor={isApprovedEditor}
+                    isEditMode={!isViewMode}
+                  />
+                </div>
+              )}
+
+              {/* Member Form */}
+              {selectedMode === "create" &&
+                user &&
+                (profile?.id || isReadyForMembers) && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <MemberForm
+                      formData={formData}
+                      setFormData={setFormData}
+                      handleMemberSave={handleAdd}
+                      handleCancelEdit={handleCancelEdit}
+                      editingId={editingId}
+                    />
+                  </div>
+                )}
+
+              {/* Save Button */}
+              {(profile?.id && isApprovedEditor) ||
+              (selectedMode === "create" && canSaveFamily) ||
+              (isJoinMode && joinSrno.trim() && formData.mobile.trim()) ? (
+                <button
+                  onClick={handleFinish}
+                  disabled={loading}
+                  className={`w-full text-white px-4 py-3 rounded-xl font-bold shadow-md text-lg transition-all duration-150 ${
+                    loading
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
+                >
+                  {loading
+                    ? "સેવ થઈ રહ્યું છે..."
+                    : profile?.id
+                    ? "ફેરફારો સેવ કરો (Family Update)"
+                    : isJoinMode
+                    ? "જોઈન રિક્વેસ્ટ મોકલો"
+                    : "ડેટા સેવ કરો (Family Create)"}
+                </button>
+              ) : null}
+            </div>
           )}
 
-          {/* MemberForm - Only for CREATE/EDIT member data */}
-          {selectedMode === 'create' && user && (profile?.id || isReadyForMembers) && ( 
-              <MemberForm
-                formData={formData}
-                setFormData={setFormData}
-                handleMemberSave={handleAdd}
-                handleCancelEdit={handleCancelEdit}
-                editingId={editingId}
-              />
-          )}
-          
-          {/* Family Save Button (This calls handleFinish) */}
-          {/* Condition to save: profile exists OR (in Create mode with members) OR (in Join mode with SRNO/Mobile) */}
-          {(profile?.id && isApprovedEditor) || (selectedMode === 'create' && canSaveFamily) || (isJoinMode && joinSrno.trim() && formData.mobile.trim()) ? (
-            <button
-              onClick={handleFinish}
-              className={`w-full text-white px-4 py-2 mt-4 rounded-lg font-bold shadow-lg 
-                ${loading ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`
-              }
-              disabled={loading}
-            >
-              {loading 
-                ? "સેવ થઈ રહ્યું છે..." 
-                : profile?.id 
-                ? "ફેરફારો સેવ કરો (Family Update)" 
-                : isJoinMode 
-                ? "જોઈન રિક્વેસ્ટ મોકલો" // Custom text for join mode
-                : "ડેટા સેવ કરો (Family Create)"
-              }
-            </button>
-          ) : null}
-
-        </>
-      )}
-
-      {/* 🛑 NEW: Pending User Message (Full Block) */}
-      {user && !isViewMode && isUserPending && !isLinkingMode && (
-          <p className="text-center p-4 mt-4 text-lg font-bold text-red-700 bg-red-100 border border-red-400 rounded-lg shadow-md">
-              ❌ તમારી ફેમિલી મેમ્બરશિપ હજુ મંજૂર થઈ નથી. તમે ડેટા એડિટ કરી શકતા નથી.
+        {/* Pending User Message */}
+        {user && !isViewMode && isUserPending && !isLinkingMode && (
+          <p className="text-center p-4 mt-4 text-red-700 bg-red-100 border border-red-300 rounded-xl font-semibold shadow-sm">
+            ❌ તમારી ફેમિલી મેમ્બરશિપ હજુ મંજૂર થઈ નથી.
           </p>
-      )}
+        )}
 
-      {/* 5. Warning / Messages */} 
-      {warning && <p className="text-red-500 mt-2">{warning}</p>}
+        {/* Warning */}
+        {warning && <p className="text-center text-red-500 font-medium">{warning}</p>}
 
-      {/* 6. Modal */}
-      <LocalForageDataModal
-        show={showDataModal}
-        content={localForageDataModalContent}
-        onClose={() => setShowDataModal(false)}
-        userUid={user?.uid}
-      />
+        {/* Modal */}
+        <LocalForageDataModal
+          show={showDataModal}
+          content={localForageDataModalContent}
+          onClose={() => setShowDataModal(false)}
+          userUid={user?.uid}
+        />
+      </div>
     </div>
   );
 };
 
 export default CombinedForm;
+
+
+

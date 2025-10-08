@@ -87,7 +87,7 @@ const Navbar = () => {
             <Link to="/profile" className="hover:text-gray-300"onClick={handleCloseMenu} >Profile</Link>
             <Link to="/boards" className="hover:text-gray-300" onClick={handleCloseMenu}>Boards</Link>
             <Link to="/matrimonial" className="hover:text-gray-300" onClick={handleCloseMenu}>Matrimonial</Link>
-            <Link to="/developer-team" className="hover:text-gray-300" onClick={handleCloseMenu}>Developer Team</Link>
+            <Link to="/team" className="hover:text-gray-300" onClick={handleCloseMenu}>Developer Team</Link>
             <Link to="/blogs" className="hover:text-gray-300" onClick={handleCloseMenu}>Blogs</Link>
             <Link to="/comments" className="hover:text-gray-300" onClick={handleCloseMenu}>Comments</Link>
             <button className="text-left hover:text-gray-300" onClick={handleCloseMenu}>Logout</button>
@@ -103,7 +103,7 @@ const Navbar = () => {
         <Link to="/profile" className="hover:text-gray-300">Profile</Link>
         <Link to="/boards" className="hover:text-gray-300">Boards</Link>
         <Link to="/matrimonial" className="hover:text-gray-300">Matrimonial</Link>
-        <Link to="/developer-team" className="hover:text-gray-300">Developer Team</Link>
+        <Link to="/team" className="hover:text-gray-300">Developer Team</Link>
         <Link to="/blogs" className="hover:text-gray-300">Blogs</Link>
         <Link to="/comments" className="hover:text-gray-300">Comments</Link>
         <button className="hover:text-gray-300">Logout</button>

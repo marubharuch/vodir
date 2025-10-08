@@ -1,142 +1,126 @@
-/* src/pages/HomePage.jsx
-Start
-  |
-  v
-Check user from AuthContext
-  |
-  v
-Is user undefined? ---- Yes ----> Show "Loading..."
-  |                                ^
-  No                               |
-  |                                |
-  v                                |
-Is user null? -------- Yes -------> Show "You are not logged in"
-  |
-  No
-  |
-  v
-Show Welcome Header + Logout Button
-  |
-  v
-Show CityRibbon
-  |
-  v
-Render CombinedForm (handles profile display/edit logic)
-  |
-  v
-End
-
-
-
-*/
 // src/pages/HomePage.jsx
 import { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";   // Remark: AuthContext se user aur logout function aa raha hai
-import { useProfile } from "../context/ProfileContext"; // Remark: ProfileContext se user ka profile aa raha hai
-import CombinedForm from "../components/CombinedForm";
-import CityRibbon from "../components/CityRibbon";
-import Carousel from "../components/Carousel";
-import CardList from "../components/CardList";
-import { images, cards } from "../data/carouselData";
+import { useAuth } from "../context/AuthContext";
+import { useProfile } from "../context/ProfileContext";
 import TeamDirectory from "./TeamDirectory";
+import CityRibbon from "../components/CityRibbon";
+// Removed unused imports: CombinedForm, Carousel, CardList, images, cards
 
+// We can define a simple icon for the Logout button
+const LogOutIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="h-5 w-5 ml-1"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3v-5a3 3 0 013-3h3"
+    />
+  </svg>
+);
 
 const HomePage = () => {
   const { user, logout } = useAuth();
-  const { profile } = useProfile();   // Remark: Profile used ho raha hai future customization ke liye
+  const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
 
-  // Remark: Ye effect ensure karta hai ki jab tak user state initialize nahi hoti, tab tak "Loading" dikhe
   useEffect(() => {
     if (user !== undefined) {
       setLoading(false);
     }
   }, [user]);
 
-  if (loading) return <div className="p-6 text-center">Loading...</div>;
+  if (loading)
+    return (
+      <div className="flex items-center justify-center min-h-screen text-lg text-indigo-600">
+        Loading...
+      </div>
+    );
 
   if (!user)
     return (
-      <div className="p-6 text-center text-red-500">
+      <div className="flex items-center justify-center min-h-screen text-lg text-red-600">
         You are not logged in.
       </div>
     );
 
+  const displayName = user?.displayName || user?.email?.split('@')[0] || "સભ્ય";
+  
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 pb-2">
-  {/* --- Ribbon --- */}
-      <CityRibbon />   {/* Remark: Ye component ek city ribbon UI dikhata hai */}
-      
+    <div className="flex flex-col min-h-screen bg-gray-100">
 
-      {/* --- Top greeting + logout --- */}
-      <div className="p-2 bg-white shadow-md flex items-center justify-between">
+      {/* --- City Ribbon (Fixed at top) --- */}
+      <CityRibbon />
+
+      {/* --- Top Header / Welcome Bar (Sticky) --- */}
+      <header className="sticky top-0 z-10 bg-white shadow-lg p-3 sm:px-6 flex items-center justify-between border-b border-gray-200">
         
-      
-       {/* <button
+        {/* Welcome Greeting */}
+        <div className="flex flex-col">
+          <h1 className="text-xl sm:text-2xl font-bold text-indigo-700">
+            👋 સ્વાગત છે, {displayName}!
+          </h1>
+          <p className="text-xs text-gray-500 hidden sm:block">
+            {user?.email}
+          </p>
+        </div>
+
+        {/* Logout Button */}
+       { /*<button
           onClick={logout}
-          className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600"
+          className="flex items-center bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-md hover:bg-red-600 transition duration-150"
+          aria-label="Logout"
         >
           Logout
-        </button>*/
-}      </div>
+          <LogOutIcon />
+        </button>
+*/}      </header>
 
-   <div className="text-center px-1 py-1 sm:px-6 sm:py-4 bg-white rounded-lg shadow-sm">
-  <h5 className="text-lg sm:text-xl font-semibold text-gray-800 mb-1">
-    Welcome, {user?.displayName || user?.email} 🎉
-  </h5>
+      {/* --- Main Content Area --- */}
+      <main className="p-4 sm:p-6 flex-1">
+        
+        {/* --- Instructions/Update Card --- */}
+        <div className="bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-indigo-100 mb-6">
+            
+            {/* Main Instruction Heading */}
+            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 mb-3 leading-snug">
+                સમાજ ડિરેક્ટરી અપડેટ
+            </h2>
 
- <p className="text-sm sm:text-base text-gray-700 leading-relaxed mb-1">
-    સમાજની ડિરેક્ટરીને સાચી અને અપડેટેડ રાખવું દરેક સભ્યની જવાબદારી છે.
-    આપના સહયોગ અને સક્રિય ભાગીદારી બદલ આભાર.
-    </p>
+            <p className="text-base text-gray-700 mb-4 border-l-4 border-indigo-500 pl-3">
+                સમાજની ડિરેક્ટરીને **સાચી અને અપડેટેડ** રાખવું દરેક સભ્યની જવાબદારી છે. આપના સહયોગ અને સક્રિય ભાગીદારી બદલ આભાર.
+            </p>
 
- <hr class="my-1 h-px bg-gray-300 border-0 dark:bg-gray-700"></hr>
-  <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
-  
+            <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-200">
+                <p className="font-semibold text-base text-indigo-700 mb-2">
+                    📢 મહત્વપૂર્ણ સૂચના:
+                </p>
+                <p className="text-sm text-gray-700 mb-2">
+                    પ્રથમ તબક્કામાં, આપણે ટેલિફોન/મોબાઇલ ડિરેક્ટરી બનાવી રહ્યા છીએ.
+                    <br/>
+                    કૃપા કરીને તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
+                </p>
+                <p className="text-sm font-bold text-indigo-800 mt-3">
+                    આપના પરિવારનો ડેટા અપડેટ કરવા માટે જમણી બાજુના નીચેના ખૂણામાં **'Family'** બટન પર ક્લિક કરો.
+                </p>
+            </div>
 
-પ્રથમ તબક્કામાં, આપણે ટેલિફોન/મોબાઇલ ડિરેક્ટરી બનાવી રહ્યા છીએ.
+        </div>
 
-Please તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
-  </p>
+        {/* --- Team Directory / Main App Component --- */}
+        <div className="mt-6">
+            <TeamDirectory />
+        </div>
+      </main>
+      
+      {/* Footer / Navigation (Assuming it's a separate component like bottom navigation) */}
+      {/* If this were a full application, a fixed bottom navigation would go here. */}
 
-
-
-    <hr class="my-1 h-px bg-gray-300 border-0 dark:bg-gray-700"></hr>
-   
-   
-   
-    <p>
-    {/* ✅ New Gujarati Instruction */}
-    આપના પરિવારનો ડેટા અપડેટ કરવા માટે જમણી બાજુના નીચેના ખૂણામાં **'ફેમિલી'** બટન પર ક્લિક કરો.
-  </p>
-
-
-  {/*<p className="text-sm sm:text-base text-gray-600 leading-relaxed">
-    Keeping the community directory accurate and updated is a shared
-    responsibility. Thank you for your support and active participation.
-    </p>
-   <hr class="my-8 h-px bg-gray-300 border-0 dark:bg-gray-700"></hr>
-    <p>
-    {/* ✅ New English Instruction 
-    Please click on the **'Family'** button in the bottom right corner to update your family data.
-  </p>*/}
-
-</div>
-
-
-      {/* --- Optional components --- */}
-      {/* <Carousel images={images} />  // Remark: Carousel abhi comment out hai, user ke liye images slide show ke liye use hota hoga */}
-      {/* <CardList cards={cards} />   // Remark: Card list UI ke liye optional hai */}
-
-      {/* --- Profile Section --- */}
-
-
-      <div className="p-4">
-        {/* Remark: CombinedForm hamesha render hota hai. Usme apna logic hai 
-            ki view mode, edit mode ya form kaise dikhana hai */}
-      { /* <CombinedForm />*/}
-      <TeamDirectory/>
-      </div>
     </div>
   );
 };

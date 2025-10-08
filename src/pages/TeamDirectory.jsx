@@ -2,7 +2,9 @@ import React from 'react';
 
 const teamData = [
   {
-    teamName: "Oswal Coders 💻",
+    teamName: "Tech wing ",
+    icon: "💻",
+    color: "indigo", // Use indigo theme for coders
     members: [
       "Sanjay Shah",
       "Virang Mehta",
@@ -11,19 +13,20 @@ const teamData = [
       "Kalp Shah",
       "Tirth Shah",
       "Jay Shah",
-      "Utsav Shah ",
+      "Utsav Shah",
       "Jinal Shah",
       "Hetavi Shah"
     ],
   },
   {
-    teamName: "Oswal Connectors 🤝",
+    teamName: "Oswal Connectors",
+    icon: "🤝",
+    color: "teal", // Use teal theme for connectors
     members: [
-      // Please replace these placeholders with the actual names
-      { name: "Connector A", remark: "(Outreach)" },
-      { name: "Connector B", remark: "(Verification)" },
-      { name: "Connector C", remark: "(Support)" },
-      { name: "Connector D", remark: "(Inspiration)" },
+      { name: "A", remark: "Admin Anand" },
+      { name: " B", remark: "Admin Borsad" },
+      { name: " C", remark: "Admin Ahmedabad" },
+      { name: "D", remark: "Admin NRI" },
     ],
   },
 ];
@@ -32,14 +35,15 @@ const teamData = [
 const MemberName = ({ member }) => {
     const isObject = typeof member === 'object';
     const name = isObject ? member.name : member;
-    const remark = isObject ? member.remark : null;
+    const remark = isObject ? `(${member.remark})` : null;
 
     return (
-        // Minimal styling: just horizontal padding and text size
-        <div className="px-1 py-1 text-base text-gray-700 whitespace-nowrap">
-            <span className="font-normal">{name}</span>
+        // Styled as a small, clean pill/badge
+        <div className="flex items-center bg-gray-100 px-3 py-1 rounded-full text-sm font-medium text-gray-700 hover:bg-gray-200 transition duration-150">
+            <span className="font-semibold">{name}</span>
             {remark && (
-                <span className="text-sm text-gray-500 ml-1">{remark}</span>
+                // Lighter text for the remark/role
+                <span className="text-xs text-gray-500 ml-1.5">{remark}</span>
             )}
         </div>
     );
@@ -48,42 +52,42 @@ const MemberName = ({ member }) => {
 // Main Team Directory Component
 const TeamDirectory = () => {
   return (
-    <div className="min-h-screen p-1 sm:p-1">
+    // Padded container with a light background for contrast
+    <div className="p-4 sm:p-6 bg-gray-50 rounded-lg">
       <div className="max-w-4xl mx-auto">
         
-        {/* Main Title 
-        <h1 className="text-l font-bold text-center text-gray-900 mb-1">
-          Project Teams
-        </h1>*/}
+        {/* Global Title */}
+        <h1 className="text-xl font-extrabold text-center text-gray-900 mb-8 border-b-2 border-indigo-200 pb-2">
+          🎯 Project Teams
+        </h1>
 
-        {/* --- Team Sections --- */}
-        {teamData.map((team, index) => (
-          <div 
-            key={index} 
-            className="mb-1" // Simple bottom margin for separation
-          >
-            
-            {/* Team Title - Centered, slightly smaller and underlined for separation */}
-        {  /*  <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6 border-b border-gray-300 pb-1 inline-block mx-auto">
-              {team.teamName}
-            </h2>*/}
-            
-            {/* Centering the H2 via inline-block and margin auto is tricky without a wrapping div, 
-                so we'll use a container just for the title if needed, but for simplicity we keep it centered.
-                A simple <p> for centering works well here: */}
-            <p className="text-center">
-                {team.teamName}
-            </p>
-
-            {/* Member List - Centered and Wrapping */}
-            <div className="flex flex-wrap justify-center gap-x-2 gap-y-2">
-              {team.members.map((member, i) => (
-                <MemberName key={i} member={member} />
-              ))}
+        {/* --- Team Sections: Use a grid for better layout on larger screens --- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {teamData.map((team, index) => (
+            <div 
+              key={index} 
+              // Card styling: Shadow, rounded corners, white background
+              className="bg-white p-6 rounded-xl shadow-l border border-gray-100"
+            >
+              
+              {/* Team Header */}
+              <div className={`flex items-center mb-5 pb-3 border-b-2 border-${team.color}-400`}>
+                <span className="text-l mr-3">{team.icon}</span>
+                <h2 className={`text-xl font-bold text-${team.color}-700`}>
+                  {team.teamName}
+                </h2>
+              </div>
+              
+              {/* Member List - Styled as a badge cloud, with wrapping and spacing */}
+              <div className="flex flex-wrap gap-2">
+                {team.members.map((member, i) => (
+                  <MemberName key={i} member={member} />
+                ))}
+              </div>
             </div>
-             <hr class="my-1 h-px bg-gray-300 border-0 dark:bg-gray-700"></hr>
-          </div>
-        ))}
+          ))}
+        </div>
         {/* --- End Team Sections --- */}
 
       </div>

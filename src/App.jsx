@@ -8,6 +8,7 @@ import BottomNav from "./components/BottomNav";
 import HousieUser from "./housie/HousieUser";
 import HousieAdmin from "./housie/HousieAdmin";
 import FamilyPage from "./pages/FamilyPage";
+import TeamDirectory from "./pages/TeamDirectory";
 import CombinedForm from "./components/CombinedForm";
 import ProfilePage from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./context/AuthContext"; // ✅ useAuth hook
@@ -41,6 +42,9 @@ function App() {
            
             <Route path="/register" element={<RegistrationPage />} />
  <Route path="/login" element={<LoginPage />} />
+
+ <Route path="/team" element={<TeamDirectory />} />
+
 <Route
   path="/profile"
   element={
