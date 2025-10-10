@@ -11,6 +11,8 @@ import CityInputs from "./CityInputs";
 import MemberList from "./MemberList";
 import MemberForm from "./MemberForm";
 import FamilySummaryView from "./FamilySummaryView";
+import JoinFamilyPopup from "./JoinFamilyPopup";
+
 import LocalForageDataModal from "./LocalForageDataModal";
 
 // ----------------------------------------------------------------------
@@ -22,6 +24,7 @@ const CombinedForm = () => {
 
   const [showDataModal, setShowDataModal] = useState(false);
   const [localForageDataModalContent, setLocalForageDataModalContent] = useState('');
+const [showJoinPopup, setShowJoinPopup] = useState(false);
 
   // ✅ States
   const [members, setMembers] = useState([]);
@@ -234,7 +237,66 @@ const CombinedForm = () => {
       //setShowDataModal(true);
     }
   };
-  
+  // new
+  const handleJoinFamily = async (srno, mobile) => {
+  setShowJoinPopup(false);
+  setLoading(true);
+  setWarning("");
+
+  try {
+    const familyRef = doc(datastore, "families", srno.toString());
+    const familySnap = await getDoc(familyRef);
+
+    if (!familySnap.exists()) {
+      setWarning(`❌ SRNO ${srno} માટે કોઈ ફેમિલી મળી નથી.`);
+      return;
+    }
+
+    const familyData = familySnap.data();
+    const members = Array.isArray(familyData.members) ? familyData.members : [];
+
+    const matchedMember = members.find(
+      (m) => m.mobile?.toString() === mobile.toString()
+    );
+
+    if (!matchedMember) {
+      setWarning("❌ દાખલ કરેલો મોબાઈલ નંબર આ ફેમિલીમાં મળ્યો નથી.");
+      return;
+    }
+
+    const existingPending = Array.isArray(familyData.pendingEditorEmails)
+      ? familyData.pendingEditorEmails
+      : [];
+    const existingEditors = Array.isArray(familyData.editorEmails)
+      ? familyData.editorEmails
+      : [];
+
+    if (existingEditors.includes(user.email)) {
+      setWarning("✅ તમે પહેલાથી જ એડિટર છો.");
+      return;
+    }
+
+    if (existingPending.includes(user.email)) {
+      setWarning("⏳ તમારી વિનંતી પહેલેથી પેન્ડિંગ છે.");
+      return;
+    }
+
+    const updatedPending = [...existingPending, user.email];
+
+    await updateDoc(familyRef, {
+      pendingEditorEmails: updatedPending,
+      updatedAt: serverTimestamp(),
+    });
+
+    setWarning(`✅ તમારી એડિટર રિક્વેસ્ટ મોકલાઈ ગઈ છે!`);
+  } catch (err) {
+    console.error("Join Family Error:", err);
+    setWarning("⚠️ Family join દરમ્યાન ભૂલ થઈ. Console તપાસો.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   // ✅ handleAdd/handleMemberSave (MemberForm se call hoga)
   const handleAdd = () => {
@@ -429,10 +491,62 @@ const CombinedForm = () => {
           setLoading(false);
       }
   };
+//
+// ... (CombinedForm.jsx માં અન્ય ફંક્શન્સ અને સ્ટેટ્સ પછી)
+
+// 🚀 NEW FUNCTION: handleUpdateFamily
+const handleUpdateFamily = async (familyIdToSave, finalMembersToSave, currentUserEmail, profile, formData, userIndexRef, familiesRef, successMessageCallback, setLoadingCallback) => {
+    try {
+        const existingEditors = Array.isArray(profile.editorEmails) ? profile.editorEmails : [];
+        const existingPending = Array.isArray(profile.pendingEditorEmails) ? profile.pendingEditorEmails : [];
+        
+        let updatedEditors = [...existingEditors];
+        let updatedPending = [...existingPending];
+        let isApprovalRequest = false;
+
+        // If current user is not an approved editor, ensure their request is captured.
+        if (!updatedEditors.includes(currentUserEmail) && !updatedPending.includes(currentUserEmail)) {
+             updatedPending.push(currentUserEmail);
+             isApprovalRequest = true;
+        }
+        
+        // 🛑 FINAL FIX: createdAt and createdBy MUST be included to avoid deletion error.
+        const finalFamilyPayload = {
+            nativeCity: formData.nativeCity,
+            currentCity: formData.currentCity,
+            members: finalMembersToSave,
+            updatedAt: serverTimestamp(),
+            editorEmails: updatedEditors, 
+            pendingEditorEmails: updatedPending,
+            
+            // ✅ Permanent Fields ને પાછું ઉમેર્યું, જેથી તે ડિલીટ ન થાય.
+            createdBy: profile.createdBy,
+            createdAt: profile.createdAt, // <--- આ ફિલ્ડ ઉમેરો
+            // Note: If 'pin' exists in the document, you must also add: pin: profile.pin,
+        };
+        
+        // 💡 ડીબગિંગ કોડ: ફાયરબેઝને મોકલાતા પેલોડને જુઓ 💡
+        const payloadString = JSON.stringify(finalFamilyPayload, null, 2);
+        console.log("🔥 PAYLOAD SENT TO FIREBASE (UPDATE):", payloadString);
+        alert("PAYLOAD SENT TO FIREBASE (Full JSON in Console):\n\n" + payloadString.substring(0, 400) + "..."); 
+        // ----------------------------------------------------
+
+        await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
+        
+        successMessageCallback(`✅ Family ${familyIdToSave} updated successfully!`);
+        return { finalFamilyPayload, isApprovalRequest };
+
+    } catch (err) {
+        throw new Error(`⚠️ Family Update failed. ${err.message || ''}`);
+    } finally {
+        setLoadingCallback(false);
+    }
+};
+// ----------------------------------------------------------------------
 
 
   // ✅ handleFinish (Family Data Save Karo button se call hoga)
-  const handleFinish = async () => {
+const handleFinish = async () => {
     // 🛑 NEW: Email Check
     const currentUserEmail = user?.email;
     if (!currentUserEmail) {
@@ -492,12 +606,13 @@ const CombinedForm = () => {
         let finalFamilyPayload = {};
         let familyIdToSave = profile?.id;
         let isApprovalRequest = false; 
+        let existingFamilyDoc = null; // To hold existing doc for localforage merge
 
         // 🤝 JOIN FAMILY LOGIC 
         if (isJoining) {
             const srnoToJoin = joinSrno.trim();
             const existingFamilyRef = doc(familiesRef, srnoToJoin);
-            const existingFamilyDoc = await getDoc(existingFamilyRef);
+            existingFamilyDoc = await getDoc(existingFamilyRef); // Fetch doc here
 
             // 🛑 NEW: Get current user's mobile data from form
             const userMobileData = {
@@ -547,12 +662,14 @@ const CombinedForm = () => {
                     isApprovalRequest = true; // Set flag
                 }
 
+                // This payload goes to Firestore
                 finalFamilyPayload = {
                     ...existingFamilyData,
                     members: finalMembersToSave,
                     updatedAt: serverTimestamp(),
                     editorEmails: existingEditors, 
                     pendingEditorEmails: updatedPendingEmails, 
+                    // Pin is omitted from payload, assuming it will be removed from doc
                 };
                 
                 await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
@@ -583,13 +700,12 @@ const CombinedForm = () => {
                 }
                 
                 familyIdToSave = newSrno.toString(); 
-                const pin = Math.floor(1000 + Math.random() * 9000).toString(); 
-
+                // 🛑 PIN REMOVED: Do not generate pin for new documents
+                
                 finalFamilyPayload = {
                     nativeCity: formData.nativeCity,
                     currentCity: formData.currentCity,
                     members: finalMembersToSave.map(m => ({ ...m, pending: false })), // Creator is not pending
-                    pin, 
                     createdBy: user.uid,
                     createdAt: serverTimestamp(),
                     // 🚀 MODIFICATION: Creator is the first approved editor
@@ -601,34 +717,27 @@ const CombinedForm = () => {
                 await set(userIndexRef, familyIdToSave); 
                 successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
 
-            } else {
+         } else {
                 // 🔄 UPDATE Existing family
                 familyIdToSave = profile.id;
+                   
+                // 🚀 NEW LOGIC: Call the dedicated update function
+                const result = await handleUpdateFamily(
+                    familyIdToSave, 
+                    finalMembersToSave, 
+                    currentUserEmail, 
+                    profile, 
+                    formData, 
+                    userIndexRef, 
+                    familiesRef, 
+                    (msg) => { successMessage = msg; }, // Callback to set message
+                    setLoading // Callback to set loading state
+                );
 
-                // 🚀 EDITOR LOGIC FOR UPDATING FAMILY 🚀
-                const existingEditors = Array.isArray(profile.editorEmails) ? profile.editorEmails : [];
-                const existingPending = Array.isArray(profile.pendingEditorEmails) ? profile.pendingEditorEmails : [];
+                finalFamilyPayload = result.finalFamilyPayload;
+                isApprovalRequest = result.isApprovalRequest;
                 
-                let updatedEditors = [...existingEditors];
-                let updatedPending = [...existingPending];
-
-                // If current user is not an approved editor, ensure their request is captured.
-                if (!updatedEditors.includes(currentUserEmail) && !updatedPending.includes(currentUserEmail)) {
-                     updatedPending.push(currentUserEmail);
-                     isApprovalRequest = true;
-                }
-                
-                finalFamilyPayload = {
-                    nativeCity: formData.nativeCity,
-                    currentCity: formData.currentCity,
-                    members: finalMembersToSave,
-                    updatedAt: serverTimestamp(),
-                    editorEmails: updatedEditors, 
-                    pendingEditorEmails: updatedPending, 
-                };
-                
-                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
-                successMessage = `✅ Family ${familyIdToSave} updated successfully!`;
+                // Note: The new function already calls updateDoc and sets the successMessage.
             }
         }
 
@@ -636,12 +745,22 @@ const CombinedForm = () => {
         const localDataToSave = {
             ...finalFamilyPayload,
             id: familyIdToSave, 
-            pin: finalFamilyPayload.pin || profile?.pin || joinSrno, 
+            // 🛑 PIN REMOVED: Do not save pin to local data
             updatedAt: Date.now(), 
             createdAt: finalFamilyPayload.createdAt || profile?.createdAt
         };
         
         await updateProfile(localDataToSave); 
+        
+        // 💡 NEW LOGIC: READ AND DISPLAY THE SAVED JSON 💡
+        const localForageKey = `profileData_${user.uid}`;
+        const finalSavedData = await localforage.getItem(localForageKey);
+        
+        const content = JSON.stringify(finalSavedData, null, 2);
+        setLocalForageDataModalContent(content);
+        setShowDataModal(true); // Open the modal with the content
+        // ---------------------------------------------
+        
         setMembers(finalMembersToSave); 
         // 🛑 MODIFIED: If joining or requesting, stay in a form-like state until approved/view mode is possible
         setIsEditing(isJoining || isApprovalRequest ? true : false); 
@@ -652,8 +771,6 @@ const CombinedForm = () => {
             alert(successMessage);
         }
         
-        await showLocalForageDataModal(); 
-        
     } catch (err) {
         setWarning(`⚠️ Save failed.`);
         console.error("RTDB/Firestore error:", err);
@@ -662,8 +779,6 @@ const CombinedForm = () => {
         setLoading(false);
     }
   };
-
-
   const startEditMember = (id) => {
     const m = members.find((x) => x.id === id);
     if (!m) return;
@@ -713,14 +828,12 @@ const CombinedForm = () => {
             </h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => {
-                  setSelectedMode("join");
-                  setIsEditing(true);
-                }}
-                className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-blue-700"
-              >
-                🤝 ફેમિલી જોઈન કરો
-              </button>
+  onClick={() => setShowJoinPopup(true)}
+  className="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-blue-700"
+>
+  🤝 ફેમિલી જોઈન કરો
+</button>
+
               <button
                 onClick={() => {
                   setSelectedMode("create");
@@ -897,6 +1010,16 @@ const CombinedForm = () => {
           userUid={user?.uid}
         />
       </div>
+
+{showJoinPopup && (
+  <JoinFamilyPopup
+    onClose={() => setShowJoinPopup(false)}
+    onSubmit={handleJoinFamily}
+  />
+)}
+
+
+
     </div>
   );
 };

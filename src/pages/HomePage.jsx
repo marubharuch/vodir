@@ -63,7 +63,7 @@ const HomePage = () => {
         {/* Welcome Greeting */}
         <div className="flex flex-col">
           <h1 className="text-xl sm:text-2xl font-bold text-indigo-700">
-            👋 સ્વાગત છે, {displayName}!
+            👋 Welcome, {displayName}!
           </h1>
           <p className="text-xs text-gray-500 hidden sm:block">
             {user?.email}
