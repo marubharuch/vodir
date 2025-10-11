@@ -67,7 +67,7 @@ const CityInputs = ({ formData, setFormData, joinSrno, setJoinSrno, profile }) =
             </div>
 
             {/* --- 3. Join SRNO --- */}
-            <div className="mb-2">
+           {/* <div className="mb-2">
                 <label htmlFor="joinSrno" className="block text-sm font-medium text-gray-700">
                     ફેમિલી SRNO દાખલ કરો (જોડાવવા માટે)
                 </label>
@@ -88,7 +88,7 @@ const CityInputs = ({ formData, setFormData, joinSrno, setJoinSrno, profile }) =
                         ${isJoinInputDisabled ? 'bg-gray-100 text-gray-500' : 'border-blue-500 focus:ring-blue-500 focus:border-blue-500'}
                     `}
                 />
-            </div>
+            </div>*/}
             {isJoinInputDisabled && (
                 <p className="text-xs text-indigo-500 mt-1">
                     તમે પહેલેથી જ Family ID: **{profile.id}** માં જોડાયેલા છો.

@@ -82,68 +82,92 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
 
 
   // ✅ HYBRID FETCH: On mount / profile change => Family fetch karo 
+  // src/components/CombinedForm.jsx
+
+// ... (existing code) ...
+
+  // ✅ HYBRID FETCH: On mount / profile change => Family fetch karo 
   useEffect(() => {
     const fetchFamilyProfile = async () => {
       setLoading(true);
       setShouldSkipCityInputs(false); // Reset skip flag
       setSelectedMode(null); // Start with no mode selected
 
-      if (profile?.id) {
-        // Data already in context/localforage. Sync local state to context.
-        setFormData((s) => ({
-          ...s,
-          nativeCity: profile.nativeCity || "",
-          currentCity: profile.currentCity || "",
-        }));
-        setMembers(profile.members || []);
-        // Start in View Mode if a profile exists
-        setIsEditing(false); 
-        setWarning("✅ તમારો ફેમિલી ડેટા લોડ થઈ ગયો છે!");
-        setLoading(false);
-        return;
-      }
-      
-      // Check RTDB index only if no local profile exists
       if (user) {
         try {
             const srnoRef = ref(db, `users/${user.uid}/familySrno`);
             const srnoSnapshot = await get(srnoRef);
             const familySrno = srnoSnapshot.val();
-
+            
+            // Check if profile is loaded from localforage (context already did this)
+            const localProfileExists = !!profile?.id;
+            const localTimestamp = profile?.lastUpdateTimestamp || 0; // Localforage time
+            
             if (familySrno) {
                 const familyDocRef = doc(datastore, "families", familySrno.toString());
-                const familyDocSnap = await getDoc(familyDocRef);
+                
+                // 🆕 1. Read RTDB Summary first (Fast read)
+                const rtdbSummaryRef = ref(db, `familyDetails/${familySrno}`);
+                const rtdbSummarySnap = await get(rtdbSummaryRef);
+                const rtdbSummary = rtdbSummarySnap.val();
+                
+                const rtdbTimestamp = rtdbSummary?.lastUpdateTimestamp || 0;
 
-                if (familyDocSnap.exists()) {
-                    const familyData = { id: familyDocSnap.id, ...familyDocSnap.data() };
+                // 2. Check for staleness: RTDB time is newer than local time
+                const isLocalStale = rtdbTimestamp > localTimestamp;
+
+                if (isLocalStale || !localProfileExists) {
+                    // CACHE MISS / STALE / First Load: Read full Firestore doc (This costs money)
+                    console.log("CACHE MISS: Fetching from Firestore.");
                     
-                    // Check if the logged-in user is already a member
-                    const currentMembers = familyData.members || [];
-                    const isUserLinked = currentMembers.some(m => m.userId === user.uid);
+                    const familyDocSnap = await getDoc(familyDocRef);
 
-                    if (isUserLinked) {
-                        // Found family & Linked -> Should not happen if profile?.id check passes, but as a fallback:
-                        await updateProfile(familyData); 
+                    if (familyDocSnap.exists()) {
+                        const familyData = { id: familyDocSnap.id, ...familyDocSnap.data() };
+                        const currentMembers = familyData.members || [];
+                        const isUserLinked = currentMembers.some(m => m.userId === user.uid);
+                        
+                        // 🛑 Update LocalForage with new timestamp
+                        const currentLocalTime = Date.now();
+                        const localDataToSave = {
+                            ...familyData, 
+                            lastUpdateTimestamp: currentLocalTime, // Set the new local time
+                            updatedAt: currentLocalTime,
+                        };
+                        
+                        await updateProfile(localDataToSave); // Update context with latest from firestore
                         setMembers(currentMembers);
-                        setIsEditing(false); // View Mode
-                        setWarning(`✅ Family ${familyDocSnap.id} synced via RTDB index.`);
+
+                        if (isUserLinked) {
+                            setIsEditing(false); // View Mode
+                            setWarning(`✅ Family ${familyDocSnap.id} synced via RTDB and Firestore.`);
+                        } else {
+                            // Found family, but user is NOT linked. Force a member-linking flow (Join Mode).
+                            setIsEditing(true); 
+                            setShouldSkipCityInputs(true); 
+                            setJoinSrno(familyDocSnap.id); 
+                            setSelectedMode('join'); 
+                            setWarning("✅ Family found. Please enter your mobile number to link your profile.");
+                        }
                     } else {
-                        // Found family, but user is NOT linked. Force a member-linking flow (Join Mode).
-                        await updateProfile(familyData); // Update context with latest from firestore
-                        setMembers(currentMembers);
-
-                        setIsEditing(true); // Force Edit/Input Mode
-                        setShouldSkipCityInputs(true); // 🆕 Skip City Inputs 
-                        setJoinSrno(familyDocSnap.id); // Pre-fill SRNO for logic consistency
-                        setSelectedMode('join'); // 🆕 Set mode to join
-                        setWarning("✅ Family found. Please enter your mobile number to link your profile.");
+                        // RTDB index found, but Firestore doc missing. Show choice screen.
+                        setIsEditing(false); 
+                        setShouldSkipCityInputs(false); 
+                        setSelectedMode(null);
+                        setWarning("⚠️ RTDB index mila, par family data Firestore mein nahi mila. Naya family banao.");
                     }
                 } else {
-                    // RTDB index found, but Firestore doc missing. Show choice screen.
-                    setIsEditing(false); 
-                    setShouldSkipCityInputs(false); 
-                    setSelectedMode(null);
-                    setWarning("⚠️ RTDB index mila, par family data Firestore mein nahi mila. Naya family banao.");
+                    // 3. CACHE HIT: Local data is fresh. Skip Firestore read!
+                    console.log("CACHE HIT: Local data is fresh. Skipping Firestore read.");
+                    // Data is already in profile context (loaded from localforage). Sync local state.
+                    setFormData((s) => ({
+                        ...s,
+                        nativeCity: profile.nativeCity || "",
+                        currentCity: profile.currentCity || "",
+                    }));
+                    setMembers(profile.members || []);
+                    setIsEditing(false); // View Mode
+                    setWarning(`✅ Family ${familySrno} synced. Local data is fresh.`);
                 }
             } else {
                 // No family found -> set to Choice Mode
@@ -170,12 +194,16 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
         setWarning("⚠️ Log in to create or join a family.");
         setLoading(false);
         setSelectedMode(null);
-    } else if (!profile?.id) {
+    } else {
         fetchFamilyProfile();
     }
-  }, [profile, user, updateProfile]);
+  }, [profile?.lastUpdateTimestamp, profile?.id, user, updateProfile]); // 🛑 Dependency change
+
+// ... (rest of the file up to enterEditMode)
   
   // 🛑 enterEditMode function (Fixed ReferenceError)
+ // ... (existing code) ...
+  // 🛑 enterEditMode function (Now acts as the Sync/Refresh button)
   const enterEditMode = async () => {
     // 🛑 NEW CHECK: Check against the strong editorEmails array
     if (!isApprovedEditor) {
@@ -190,14 +218,21 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
 
     try {
         if (profile?.id) {
-            // ... (rest of edit mode logic remains the same)
             const familyDocRef = doc(datastore, "families", profile.id);
-            const familyDocSnap = await getDoc(familyDocRef);
+            const familyDocSnap = await getDoc(familyDocRef); // <-- Force Firestore Read (Sync)
 
             if (familyDocSnap.exists()) {
                 const familyData = { id: familyDocSnap.id, ...familyDocSnap.data() };
                 
-                await updateProfile(familyData); 
+                // 🛑 Update LocalForage with new timestamp after manual sync
+                const currentLocalTime = Date.now();
+                const localDataToSave = {
+                    ...familyData,
+                    lastUpdateTimestamp: currentLocalTime, // Set the new local time
+                    updatedAt: currentLocalTime,
+                };
+                
+                await updateProfile(localDataToSave); 
                 setMembers(familyData.members || []);
                 
                 setFormData(s => ({ 
@@ -207,7 +242,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
                 }));
                 
                 setIsEditing(true);
-                setWarning("✅ Data Refreshed. You are now in EDIT mode.");
+                setWarning("✅ Data Refreshed from Firestore. You are now in EDIT mode.");
             } else {
                 setWarning("⚠️ Family data not found in Firestore. Please contact admin.");
             }
@@ -219,6 +254,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
         setLoading(false);
     }
   };
+// ... (rest of the file)
 
 
   const showLocalForageDataModal = async () => {
@@ -255,6 +291,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
     const familyData = familySnap.data();
     const members = Array.isArray(familyData.members) ? familyData.members : [];
 
+    // 🧩 Step 1: Check if mobile matches
     const matchedMember = members.find(
       (m) => m.mobile?.toString() === mobile.toString()
     );
@@ -264,6 +301,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
       return;
     }
 
+    // 🧩 Step 2: Check editor status
     const existingPending = Array.isArray(familyData.pendingEditorEmails)
       ? familyData.pendingEditorEmails
       : [];
@@ -272,7 +310,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
       : [];
 
     if (existingEditors.includes(user.email)) {
-      setWarning("✅ તમે પહેલાથી જ એડિટર છો.");
+      setWarning("✅ તમે પહેલેથી જ એડિટર છો.");
       return;
     }
 
@@ -281,13 +319,18 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
       return;
     }
 
+    // 🧩 Step 3: Add to pending editors in Firestore
     const updatedPending = [...existingPending, user.email];
-
     await updateDoc(familyRef, {
       pendingEditorEmails: updatedPending,
       updatedAt: serverTimestamp(),
     });
 
+    // 🧩 Step 4: Link SRNO in RTDB for future syncs
+    const userIndexRef = ref(db, `users/${user.uid}/familySrno`);
+    await set(userIndexRef, srno.toString());
+
+    // 🧩 Step 5: Success message
     setWarning(`✅ તમારી એડિટર રિક્વેસ્ટ મોકલાઈ ગઈ છે!`);
   } catch (err) {
     console.error("Join Family Error:", err);
@@ -296,6 +339,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
     setLoading(false);
   }
 };
+
 
 
   // ✅ handleAdd/handleMemberSave (MemberForm se call hoga)
@@ -546,239 +590,270 @@ const handleUpdateFamily = async (familyIdToSave, finalMembersToSave, currentUse
 
 
   // ✅ handleFinish (Family Data Save Karo button se call hoga)
+// ... (existing code up to handleFinish)
+
+// ✅ handleFinish (Family Data Save Karo button se call hoga)
 const handleFinish = async () => {
-    // 🛑 NEW: Email Check
-    const currentUserEmail = user?.email;
-    if (!currentUserEmail) {
-        setWarning("❌ યુઝરનો ઇમેલ મળતો નથી. ફરીથી લોગિન કરો.");
+  console.log("handleFinish");
+
+  // 🛑 NEW: Email Check
+  const currentUserEmail = user?.email;
+  if (!currentUserEmail) {
+    setWarning("❌ યુઝરનો ઇમેલ મળતો નથી. ફરીથી લોગિન કરો.");
+    setLoading(false);
+    return;
+  }
+
+  if (isUserPending) {
+    setWarning("❌ મંજૂરી બાકી હોવાને કારણે તમે ડેટા સેવ કરી શકતા નથી.");
+    setLoading(false);
+    return;
+  }
+
+  setLoading(true);
+
+  let finalMembersToSave = [...members];
+  const isJoining = isJoinMode && !profile?.id; // Use isJoinMode
+
+  // 1. FINAL CHECK: If form has unsaved member and we can add (CREATE/EDIT mode only)
+  if (canAdd && !editingId && !isJoining) {
+    const newMemberData = {
+      id: crypto.randomUUID(),
+      userId: user.uid,
+      gender: formData.gender,
+      name: (formData.name || "").trim(),
+      countryCode: formData.countryCode,
+      mobile: (formData.mobile || "").trim(),
+      pending: false,
+    };
+
+    finalMembersToSave.push(newMemberData);
+
+    setFormData((s) => ({
+      ...s,
+      gender: "",
+      name: "",
+      countryCode: "+91",
+      mobile: "",
+    }));
+  }
+
+  // In join mode, we don't allow creating new member entries locally until check
+  if (!isJoining && finalMembersToSave.length === 0) {
+    setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો અથવા SRNO દાખલ કરો.");
+    setLoading(false);
+    return;
+  }
+
+  const masterIndexRef = ref(db, "master/familyIndex");
+  const userIndexRef = ref(db, `users/${user.uid}/familySrno`);
+  const familiesRef = collection(datastore, "families");
+  let successMessage = "";
+
+  try {
+    let finalFamilyPayload = {};
+    let familyIdToSave = profile?.id;
+    let isApprovalRequest = false;
+    let existingFamilyDoc = null;
+
+    // --------------------
+    // 🤝 JOIN FAMILY LOGIC
+    // --------------------
+    if (isJoining) {
+      const srnoToJoin = (joinSrno || "").trim();
+      const existingFamilyRef = doc(familiesRef, srnoToJoin);
+      existingFamilyDoc = await getDoc(existingFamilyRef);
+
+      // Get current user's mobile data from form (trimmed)
+      const userMobileData = {
+        countryCode: formData.countryCode,
+        mobile: (formData.mobile || "").trim(),
+        name: formData.name ? formData.name.trim() : "Linking User",
+        gender: formData.gender || "M/F",
+        id: crypto.randomUUID(),
+      };
+
+      if (!existingFamilyDoc.exists()) {
+        setWarning(`⚠️ Invalid Family ID (SRNO): ${srnoToJoin}. Family not found in Firestore.`);
         setLoading(false);
         return;
-    }
+      }
 
-    if (isUserPending) {
-      setWarning("❌ મંજૂરી બાકી હોવાને કારણે તમે ડેટા સેવ કરી શકતા નથી.");
-      setLoading(false);
-      return;
-    }
-    
-    setLoading(true);
+      const existingFamilyData = existingFamilyDoc.data();
+      familyIdToSave = existingFamilyDoc.id;
 
-    let finalMembersToSave = [...members]; 
-    const isJoining = isJoinMode && !profile?.id; // Use isJoinMode
+      // Work on a copy of members
+      let updatedMembers = Array.isArray(existingFamilyData.members) ? [...existingFamilyData.members] : [];
 
-    // 1. FINAL CHECK: Agar form mein unsaved member data hai, toh use pehle list mein add karo.
-    // 🛑 Only allow adding in CREATE/EDIT mode, not JOIN mode.
-    if (canAdd && !editingId && !isJoining) {
-        const newMemberData = {
-          id: crypto.randomUUID(),
-          userId: user.uid,
-          gender: formData.gender, 
-          name: formData.name.trim(), 
-          countryCode: formData.countryCode,
-          mobile: formData.mobile,
-          pending: false, 
-        };
-        
-        finalMembersToSave.push(newMemberData);
-        
-        setFormData((s) => ({
-            ...s,
-            gender: "",
-            name: "",
-            countryCode: "+91",
-            mobile: "",
-        }));
-    }
-    
-    // In join mode, we don't save new members to finalMembersToSave until we check Firestore.
-    if (!isJoining && finalMembersToSave.length === 0) {
-      setWarning("⚠️ ઓછામાં ઓછો એક સભ્ય ઉમેરો અથવા SRNO દાખલ કરો.");
-      setLoading(false);
-      return;
-    }
+      // STEP 1: Check if mobile number exists in family members
+      const mobileMatchIndex = updatedMembers.findIndex(
+        (m) =>
+          (m.mobile || "").trim() === userMobileData.mobile &&
+          (m.countryCode || "") === userMobileData.countryCode
+      );
 
-    const masterIndexRef = ref(db, 'master/familyIndex');
-    const userIndexRef = ref(db, `users/${user.uid}/familySrno`);
-    const familiesRef = collection(datastore, "families");
-    let successMessage = "";
-
-    try {
-        let finalFamilyPayload = {};
-        let familyIdToSave = profile?.id;
-        let isApprovalRequest = false; 
-        let existingFamilyDoc = null; // To hold existing doc for localforage merge
-
-        // 🤝 JOIN FAMILY LOGIC 
-        if (isJoining) {
-            const srnoToJoin = joinSrno.trim();
-            const existingFamilyRef = doc(familiesRef, srnoToJoin);
-            existingFamilyDoc = await getDoc(existingFamilyRef); // Fetch doc here
-
-            // 🛑 NEW: Get current user's mobile data from form
-            const userMobileData = {
-                countryCode: formData.countryCode,
-                mobile: formData.mobile.trim(),
-                name: "Linking User", // Default value
-                gender: "M/F", // Default value
-                id: crypto.randomUUID(),
-            };
-
-            if (existingFamilyDoc.exists()) {
-                const existingFamilyData = existingFamilyDoc.data();
-                familyIdToSave = existingFamilyDoc.id; 
-                
-                let updatedMembers = existingFamilyData.members;
-
-                // 🆕 STEP 1: Check if mobile number exists in family members
-                const mobileMatchIndex = updatedMembers.findIndex(m => 
-                    m.mobile === userMobileData.mobile && m.countryCode === userMobileData.countryCode
-                );
-
-                if (mobileMatchIndex === -1) {
-                    setWarning("❌ તમે દાખલ કરેલો મોબાઈલ નંબર આ ફેમિલીના કોઈપણ સભ્ય સાથે મેચ થતો નથી.");
-                    setLoading(false);
-                    return;
-                }
-
-                // 🆕 STEP 2: Update the member entry with the user's UID and set pending
-                updatedMembers[mobileMatchIndex] = {
-                    ...updatedMembers[mobileMatchIndex],
-                    userId: user.uid,
-                    pending: true, // Always pending on join/link
-                    // Preserve existing data, only update userId/pending
-                };
-                
-                finalMembersToSave = updatedMembers; // Prepare for local update
-                
-                // 🚀 EDITOR LOGIC FOR JOINING FAMILY 🚀
-                const existingEditors = Array.isArray(existingFamilyData.editorEmails) ? existingFamilyData.editorEmails : [];
-                const existingPending = Array.isArray(existingFamilyData.pendingEditorEmails) ? existingFamilyData.pendingEditorEmails : [];
-
-                let updatedPendingEmails = [...existingPending];
-
-                // Check if user is already an Editor or Pending Editor
-                if (!existingEditors.includes(currentUserEmail) && !existingPending.includes(currentUserEmail)) {
-                    updatedPendingEmails.push(currentUserEmail);
-                    isApprovalRequest = true; // Set flag
-                }
-
-                // This payload goes to Firestore
-                finalFamilyPayload = {
-                    ...existingFamilyData,
-                    members: finalMembersToSave,
-                    updatedAt: serverTimestamp(),
-                    editorEmails: existingEditors, 
-                    pendingEditorEmails: updatedPendingEmails, 
-                    // Pin is omitted from payload, assuming it will be removed from doc
-                };
-                
-                await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
-                await set(userIndexRef, familyIdToSave); 
-                
-                successMessage = `✅ Family ${familyIdToSave} joined! Your request is pending approval.`;
-
-            } else {
-                setWarning(`⚠️ Invalid Family ID (SRNO): ${srnoToJoin}. Family not found in Firestore.`);
-                setLoading(false);
-                return;
-            }
-        } 
-        // 🆕 CREATE or 🔄 UPDATE LOGIC
-        else {
-            if (!profile?.id) {
-                // --- NEW FAMILY CREATION ---
-                let newSrno;
-                const result = await runTransaction(masterIndexRef, (currentData) => { 
-                    let data = currentData || { nextSrno: 1 };
-                    newSrno = data.nextSrno || 1;
-                    data.nextSrno = newSrno + 1;
-                    return data; 
-                });
-
-                if (!result.committed) {
-                    throw new Error("Failed to commit RTDB transaction for SRNO. Please retry.");
-                }
-                
-                familyIdToSave = newSrno.toString(); 
-                // 🛑 PIN REMOVED: Do not generate pin for new documents
-                
-                finalFamilyPayload = {
-                    nativeCity: formData.nativeCity,
-                    currentCity: formData.currentCity,
-                    members: finalMembersToSave.map(m => ({ ...m, pending: false })), // Creator is not pending
-                    createdBy: user.uid,
-                    createdAt: serverTimestamp(),
-                    // 🚀 MODIFICATION: Creator is the first approved editor
-                    editorEmails: [currentUserEmail], 
-                    pendingEditorEmails: [], // Initialize pending array as empty
-                };
-                
-                await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload); 
-                await set(userIndexRef, familyIdToSave); 
-                successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
-
-         } else {
-                // 🔄 UPDATE Existing family
-                familyIdToSave = profile.id;
-                   
-                // 🚀 NEW LOGIC: Call the dedicated update function
-                const result = await handleUpdateFamily(
-                    familyIdToSave, 
-                    finalMembersToSave, 
-                    currentUserEmail, 
-                    profile, 
-                    formData, 
-                    userIndexRef, 
-                    familiesRef, 
-                    (msg) => { successMessage = msg; }, // Callback to set message
-                    setLoading // Callback to set loading state
-                );
-
-                finalFamilyPayload = result.finalFamilyPayload;
-                isApprovalRequest = result.isApprovalRequest;
-                
-                // Note: The new function already calls updateDoc and sets the successMessage.
-            }
-        }
-
-        // 5. Local State Update (Saves to localforage)
-        const localDataToSave = {
-            ...finalFamilyPayload,
-            id: familyIdToSave, 
-            // 🛑 PIN REMOVED: Do not save pin to local data
-            updatedAt: Date.now(), 
-            createdAt: finalFamilyPayload.createdAt || profile?.createdAt
-        };
-        
-        await updateProfile(localDataToSave); 
-        
-        // 💡 NEW LOGIC: READ AND DISPLAY THE SAVED JSON 💡
-        const localForageKey = `profileData_${user.uid}`;
-        const finalSavedData = await localforage.getItem(localForageKey);
-        
-        const content = JSON.stringify(finalSavedData, null, 2);
-        setLocalForageDataModalContent(content);
-        setShowDataModal(true); // Open the modal with the content
-        // ---------------------------------------------
-        
-        setMembers(finalMembersToSave); 
-        // 🛑 MODIFIED: If joining or requesting, stay in a form-like state until approved/view mode is possible
-        setIsEditing(isJoining || isApprovalRequest ? true : false); 
-        setShouldSkipCityInputs(false); 
-        setSelectedMode(isJoining || isApprovalRequest ? 'join' : null);
-        
-        if (successMessage) {
-            alert(successMessage);
-        }
-        
-    } catch (err) {
-        setWarning(`⚠️ Save failed.`);
-        console.error("RTDB/Firestore error:", err);
-        alert(`⚠️ Save failed. ${err.message || ''}`);
-    } finally {
+      if (mobileMatchIndex === -1) {
+        setWarning("❌ તમે દાખલ કરેલો મોબાઈલ નંબર આ ફેમિલીના કોઈપણ સભ્ય સાથે મેચ થતો નથી.");
         setLoading(false);
+        return;
+      }
+
+      // STEP 2: Update the member entry with the user's UID and set pending
+      updatedMembers[mobileMatchIndex] = {
+        ...updatedMembers[mobileMatchIndex],
+        userId: user.uid,
+        pending: true,
+      };
+
+      finalMembersToSave = updatedMembers;
+
+      // EDITOR LOGIC FOR JOINING FAMILY
+      const existingEditors = Array.isArray(existingFamilyData.editorEmails) ? existingFamilyData.editorEmails : [];
+      const existingPending = Array.isArray(existingFamilyData.pendingEditorEmails)
+        ? existingFamilyData.pendingEditorEmails
+        : [];
+
+      let updatedPendingEmails = [...existingPending];
+
+      if (!existingEditors.includes(currentUserEmail) && !existingPending.includes(currentUserEmail)) {
+        updatedPendingEmails.push(currentUserEmail);
+        isApprovalRequest = true;
+      }
+
+      finalFamilyPayload = {
+        ...existingFamilyData,
+        members: finalMembersToSave,
+        updatedAt: serverTimestamp(),
+        editorEmails: existingEditors,
+        pendingEditorEmails: updatedPendingEmails,
+      };
+
+      // Update Firestore family doc and set user's family srno index
+      await updateDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload);
+      await set(userIndexRef, familyIdToSave);
+
+      successMessage = `✅ Family ${familyIdToSave} joined! Your request is pending approval.`;
+    } 
+    // --------------------
+    // CREATE or UPDATE
+    // --------------------
+    else {
+      if (!profile?.id) {
+        // --- NEW FAMILY CREATION ---
+        let newSrno;
+        const result = await runTransaction(masterIndexRef, (currentData) => {
+          let data = currentData || { nextSrno: 1 };
+          newSrno = data.nextSrno || 1;
+          data.nextSrno = newSrno + 1;
+          return data;
+        });
+
+        if (!result.committed) {
+          throw new Error("Failed to commit RTDB transaction for SRNO. Please retry.");
+        }
+
+        familyIdToSave = newSrno.toString();
+
+        finalFamilyPayload = {
+          nativeCity: formData.nativeCity,
+          currentCity: formData.currentCity,
+          members: finalMembersToSave.map((m) => ({ ...m, pending: false })),
+          createdBy: user.uid,
+          createdAt: serverTimestamp(),
+          editorEmails: [currentUserEmail],
+          pendingEditorEmails: [],
+        };
+
+        await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload);
+        await set(userIndexRef, familyIdToSave);
+        successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
+
+        // 🚀 RTDB SUMMARY WRITE for NEW FAMILY
+        const rtdbSummaryRef = ref(db, `familyDetails/${familyIdToSave}`);
+        const totalMembers = finalMembersToSave.length;
+        const secondMember = finalMembersToSave[1]?.name || "";
+
+        await set(rtdbSummaryRef, {
+          lastUpdateTimestamp: Date.now(),
+          nativeCity: finalFamilyPayload.nativeCity,
+          currentCity: finalFamilyPayload.currentCity,
+          secondMemberName: secondMember,
+          totalMembers: totalMembers,
+        });
+      } else {
+        // 🔄 UPDATE Existing family via dedicated function
+        familyIdToSave = profile.id;
+
+        const result = await handleUpdateFamily(
+          familyIdToSave,
+          finalMembersToSave,
+          currentUserEmail,
+          profile,
+          formData,
+          userIndexRef,
+          familiesRef,
+          (msg) => {
+            successMessage = msg;
+          },
+          setLoading
+        );
+
+        finalFamilyPayload = result.finalFamilyPayload;
+        isApprovalRequest = result.isApprovalRequest;
+
+        // 🚀 RTDB SUMMARY WRITE for UPDATE
+        const rtdbSummaryRef = ref(db, `familyDetails/${familyIdToSave}`);
+        const totalMembers = finalMembersToSave.length;
+        const secondMember = finalMembersToSave[1]?.name || "";
+
+        await set(rtdbSummaryRef, {
+          lastUpdateTimestamp: Date.now(),
+          nativeCity: finalFamilyPayload.nativeCity,
+          currentCity: finalFamilyPayload.currentCity,
+          secondMemberName: secondMember,
+          totalMembers: totalMembers,
+        });
+      }
     }
-  };
+
+    // 5. Local State Update (Saves to localforage)
+    const currentLocalTime = Date.now();
+    const localDataToSave = {
+      ...finalFamilyPayload,
+      id: familyIdToSave,
+      updatedAt: currentLocalTime,
+      createdAt: finalFamilyPayload.createdAt || profile?.createdAt,
+      lastUpdateTimestamp: currentLocalTime,
+    };
+
+    await updateProfile(localDataToSave);
+
+    // 💡 READ AND DISPLAY THE SAVED JSON
+    const localForageKey = `profileData_${user.uid}`;
+    const finalSavedData = await localforage.getItem(localForageKey);
+
+    const content = JSON.stringify(finalSavedData, null, 2);
+    setLocalForageDataModalContent(content);
+    setShowDataModal(true);
+
+    setMembers(finalMembersToSave);
+    setIsEditing(isJoining || isApprovalRequest ? true : false);
+    setShouldSkipCityInputs(false);
+    setSelectedMode(isJoining || isApprovalRequest ? "join" : null);
+
+    if (successMessage) {
+      alert(successMessage);
+    }
+  } catch (err) {
+    setWarning(`⚠️ Save failed.`);
+    console.error("RTDB/Firestore error:", err);
+    alert(`⚠️ Save failed. ${err.message || ""}`);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// ... (rest of the file)
   const startEditMember = (id) => {
     const m = members.find((x) => x.id === id);
     if (!m) return;
@@ -849,32 +924,47 @@ const handleFinish = async () => {
 
         {/* Pending Editor Requests */}
         {profile?.id &&
-          isApprovedEditor &&
-          Array.isArray(profile.pendingEditorEmails) &&
-          profile.pendingEditorEmails.length > 0 && (
-            <div className="p-4 border border-blue-300 bg-blue-50 rounded-xl">
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">
-                🖊️ Pending Editor Requests
-              </h3>
-              <ul className="space-y-2">
-                {profile.pendingEditorEmails.map((email) => (
-                  <li
-                    key={email}
-                    className="flex justify-between items-center bg-white border rounded-md p-2"
-                  >
-                    <span className="text-gray-700 text-sm sm:text-base">{email}</span>
-                    <button
-                      onClick={() => approveEditorRequest(email)}
-                      className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 disabled:bg-gray-400"
-                      disabled={loading}
-                    >
-                      Approve
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+  isApprovedEditor &&
+  Array.isArray(profile.pendingEditorEmails) &&
+  profile.pendingEditorEmails.length > 0 && (
+    <div className="p-4 border border-blue-300 bg-blue-50 rounded-xl">
+      <h3 className="text-lg font-semibold text-blue-700 mb-2">
+        🖊️ Pending Editor Requests
+      </h3>
+      <ul className="space-y-2">
+        {profile.pendingEditorEmails.map((email) => (
+          <li
+            key={email}
+            className="flex justify-between items-center bg-white border rounded-md p-2"
+          >
+            {/* 🔴 Reject button first */}
+            <button
+              onClick={() => handleEditorApproval(email, false)}
+              className="bg-red-600 text-white text-sm px-3 py-1 rounded hover:bg-red-700 disabled:bg-gray-400"
+              disabled={loading}
+            >
+              Reject
+            </button>
+
+            {/* 📧 Email in center */}
+            <span className="text-gray-700 text-sm sm:text-base font-medium text-center flex-1">
+              {email}
+            </span>
+
+            {/* 🟢 Approve button last */}
+            <button
+              onClick={() => handleEditorApproval(email, true)}
+              className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700 disabled:bg-gray-400"
+              disabled={loading}
+            >
+              Approve
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
 
         {/* Edit / Create / Join Mode */}
         {user &&
