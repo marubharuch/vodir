@@ -481,7 +481,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
     }
   };
 
-  // ✅ NEW: Function to Approve a pending editor
+  // ✅ NEW: Function to Approve a pending editor - check is it duplicate....
   const approveEditorRequest = async (emailToApprove) => {
       // 🛑 Check against strong editor flag
       if (!isApprovedEditor) {
@@ -536,6 +536,56 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
       }
   };
 //
+// ✅ Unified Approve/Reject handler for editor requests
+const handleEditorApproval = async (email, approve) => {
+  if (approve) {
+    // ✅ Approve editor
+    await approveEditorRequest(email);
+  } else {
+    // ❌ Reject editor request
+    if (!isApprovedEditor) {
+      setWarning("⚠️ તમને એડિટરની વિનંતી રદ કરવાની પરવાનગી નથી.");
+      return;
+    }
+
+    if (!window.confirm(`Do you want to REJECT editing access for: ${email}?`)) {
+      return;
+    }
+
+    setLoading(true);
+    const familyIdToSave = profile.id;
+    const familiesRef = collection(datastore, "families");
+
+    try {
+      const currentPending = Array.isArray(profile.pendingEditorEmails)
+        ? profile.pendingEditorEmails
+        : [];
+
+      const updatedPending = currentPending.filter((e) => e !== email);
+
+      await updateDoc(doc(familiesRef, familyIdToSave), {
+        pendingEditorEmails: updatedPending,
+        updatedAt: serverTimestamp(),
+      });
+
+      const localDataToSave = {
+        ...profile,
+        pendingEditorEmails: updatedPending,
+        updatedAt: Date.now(),
+      };
+      await updateProfile(localDataToSave);
+
+      setWarning(`❌ ${email} ની એડિટર વિનંતી રદ કરી.`);
+    } catch (err) {
+      console.error("Reject editor error:", err);
+      setWarning("⚠️ વિનંતી રદ કરવામાં ભૂલ થઈ.");
+    } finally {
+      setLoading(false);
+    }
+  }
+};
+
+
 // ... (CombinedForm.jsx માં અન્ય ફંક્શન્સ અને સ્ટેટ્સ પછી)
 
 // 🚀 NEW FUNCTION: handleUpdateFamily
