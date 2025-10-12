@@ -12,6 +12,7 @@ const MemberList = ({
 }) => {
     return (
         <div className="mt-4 p-3 border rounded-lg bg-white shadow-md">
+            memberlist
             <h2 className="text-xl font-bold mb-3 text-gray-800">સભ્ય યાદી (Total: {members.length})</h2>
             
             {members.length === 0 && <p className="text-gray-500">No members added yet.</p>}

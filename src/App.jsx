@@ -9,7 +9,8 @@ import HousieUser from "./housie/HousieUser";
 import HousieAdmin from "./housie/HousieAdmin";
 import FamilyPage from "./pages/FamilyPage";
 import TeamDirectory from "./pages/TeamDirectory";
-import CombinedForm from "./components/CombinedForm";
+
+import CombinedForm from "./components/CombinedForm/CombinedForm";
 import ProfilePage from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./context/AuthContext"; // ✅ useAuth hook
 import { ProfileProvider } from "./context/ProfileContext";

@@ -8,6 +8,7 @@ const FamilySummaryView = ({ profile, members, enterEditMode, loading, isUserNon
 
   return (
     <div className="p-4 border rounded-lg shadow bg-white">
+      family summary
      { /*<h5 className="text-2xl font-bold mb-4 text-indigo-700">🏠 Family</h5>*/}
       <div className="mb-1 space-y-2 border-b pb-1 text-gray-700">
         <p><strong>ID:</strong> <span className="text-red-600 font-bold">{profile.id}</span></p>

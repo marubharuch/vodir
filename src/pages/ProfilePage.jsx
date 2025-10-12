@@ -1,5 +1,7 @@
 import React from "react";
-import CombinedForm from "../components/CombinedForm";
+import CombinedForm from "../components/CombinedForm/CombinedForm";
+//import CombinedForm from "@/components/CombinedForm";
+
 import { useProfile } from "../context/ProfileContext";
 
 const ProfilePage = () => {

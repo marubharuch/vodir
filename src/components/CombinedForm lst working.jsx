@@ -19,6 +19,7 @@ import LocalForageDataModal from "./LocalForageDataModal";
 // 🚀 MAIN COMPONENT: CombinedForm
 // ----------------------------------------------------------------------
 const CombinedForm = () => {
+  console.log("old combine form")
   const { profile, updateProfile } = useProfile();
   const { user } = useAuth();
 
@@ -1165,6 +1166,5 @@ const handleFinish = async () => {
 };
 
 export default CombinedForm;
-
 
 

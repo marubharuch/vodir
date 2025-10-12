@@ -1,7 +1,7 @@
 import React from 'react';
 
 const CityInputs = ({ formData, setFormData, joinSrno, setJoinSrno, profile }) => {
-    
+    console.log("cityinput")
     // Determine if the Join SRNO input should be disabled
     // It is disabled if a family profile already exists (profile?.id is true)
     const isJoinInputDisabled = !!profile?.id;

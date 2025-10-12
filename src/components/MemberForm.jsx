@@ -4,6 +4,7 @@ import React from "react";
 const MemberForm = ({ formData, setFormData, handleMemberSave, handleCancelEdit, editingId }) => (
   // Main container with shadow and distinct background
   <div className="mt-4 p-5 bg-white border border-gray-200 rounded-xl shadow-lg">
+    member form
     <h2 className="text-xl font-extrabold text-gray-800 mb-4 flex items-center">
       <span className="mr-2 text-indigo-600">📝</span> સભ્યની વિગતો
     </h2>
@@ -19,16 +20,39 @@ const MemberForm = ({ formData, setFormData, handleMemberSave, handleCancelEdit,
     />
 
     {/* Gender Select */}
-    <select
-      value={formData.gender}
-      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-      className="w-full p-3 mb-4 border border-gray-300 rounded-lg bg-white appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      aria-label="Gender"
+    /* Gender Select - Segmented Toggle */
+<div className="mb-4">
+  <label className="block text-gray-700 text-sm font-bold mb-2">
+    જાતિ (Gender)
+  </label>
+  <div className="flex rounded-lg border border-indigo-500 p-1 bg-gray-100">
+    {/* Male Button */}
+    <button
+      type="button"
+      onClick={() => setFormData({ ...formData, gender: 'Male' })}
+      className={`flex-1 py-2 text-sm font-medium transition-colors duration-200 ${
+        formData.gender === 'Male'
+          ? 'bg-indigo-500 text-white shadow-md rounded-md' // Active state
+          : 'text-indigo-600 hover:bg-gray-200 rounded-md' // Inactive state
+      }`}
     >
-      <option value="" disabled>જાતિ (M/F)</option>
-      <option value="Male">Male</option>
-      <option value="Female">Female</option>
-    </select>
+      Male
+    </button>
+
+    {/* Female Button */}
+    <button
+      type="button"
+      onClick={() => setFormData({ ...formData, gender: 'Female' })}
+      className={`flex-1 py-2 text-sm font-medium transition-colors duration-200 ${
+        formData.gender === 'Female'
+          ? 'bg-indigo-500 text-white shadow-md rounded-md' // Active state
+          : 'text-indigo-600 hover:bg-gray-200 rounded-md' // Inactive state
+      }`}
+    >
+      Female
+    </button>
+  </div>
+</div>
     
     {/* --- Mobile Number Group: The FIX is here --- */}
     {/* By removing the horizontal flex and using a grid/gap on mobile, 
