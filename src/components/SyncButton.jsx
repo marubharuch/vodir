@@ -1,43 +1,41 @@
 import React, { useState } from "react";
-import { dataStore } from "../localDb";
+import { useProfile } from "../context/ProfileContext";
+import { useAuth } from "../context/AuthContext";
+import { loadFamilyProfile } from "../utils/loadFamilyProfile";
+import safeLocalForage from "../utils/safeLocalForage";
 
 const SyncButton = () => {
-  const [status, setStatus] = useState("");
+  const { user } = useAuth();
+  const { updateProfile } = useProfile();
+  const [loading, setLoading] = useState(false);
 
   const handleSync = async () => {
+    if (!user) return;
+    setLoading(true);
     try {
-      setStatus("🔄 Syncing...");
-
-      // Example: Local data export
-      const allKeys = await dataStore.keys();
-      const localData = {};
-      for (const key of allKeys) {
-        localData[key] = await dataStore.getItem(key);
-      }
-
-      console.log("Local Data:", localData);
-
-      // 👉 અહીં તમે Firebase / AWS API સાથે integrate કરી શકો છો
-      // await syncWithFirestore(localData);
-      // await syncWithAws(localData);
-
-      setStatus("✅ Sync successful!");
+      // Remove old cache
+      await safeLocalForage.removeItem("profileData");
+      // Reload fresh from Firebase
+      await loadFamilyProfile(user, updateProfile);
+      alert("✅ Data synced successfully!");
     } catch (err) {
       console.error(err);
-      setStatus("❌ Sync failed");
+      alert("❌ Sync failed. Check console.");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div>
-      <button
-        onClick={handleSync}
-        className="px-4 py-2 bg-blue-500 text-white rounded"
-      >
-        Sync Data
-      </button>
-      {status && <p className="mt-2 text-sm">{status}</p>}
-    </div>
+    <button
+      onClick={handleSync}
+      disabled={loading}
+      className={`px-4 py-2 rounded text-white ${
+        loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+      }`}
+    >
+      {loading ? "Syncing..." : "Sync Data"}
+    </button>
   );
 };
 

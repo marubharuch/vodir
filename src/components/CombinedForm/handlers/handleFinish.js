@@ -19,7 +19,7 @@ export async function handleFinish(
     setWarning("❌ યુઝરનો ઇમેલ મળતો નથી. ફરીથી લોગિન કરો.");
     return;
   }
-
+console.log("handle finish")
   setLoading(true);
   setWarning("");
 

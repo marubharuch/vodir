@@ -19,10 +19,9 @@ const FamilySummaryView = ({
   if (!profile?.id) return null;
 
   const creator = members.find((m) => m.userId === profile.createdBy)?.name || "N/A";
-console.log("family summary")
+
   return (
     <div className="p-4 border rounded-lg shadow bg-white">
-      
       <div className="mb-1 space-y-2 border-b pb-1 text-gray-700">
         <p>
           <strong>ID:</strong> <span className="text-red-600 font-bold">{profile.id}</span>
@@ -42,18 +41,18 @@ console.log("family summary")
           {m.pending && <span className="ml-2 text-xs text-red-600">⏳ Pending</span>}
         </div>
       ))}
-{(isUserNonPendingEditor || isUserPending) && (
+
+      {(isUserNonPendingEditor || isUserPending) && (
         <button
           onClick={enterEditMode}
-          // Button tab disabled hoga jab data load ho raha ho ya user pending ho
-          disabled={loading || isUserPending} 
-          className="mt-4 w-full bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-700 transition"
+          disabled={loading || isUserPending}
+          className={`w-full mt-4 px-4 py-2 text-white rounded ${
+            loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
-          {/* Button Text */}
-          {isUserPending ? "⏳ Waiting for Approval" : "✏️ Modify Family Data"}
+          {isUserPending ? "⏳ Pending Approval" : "✏️ Modify Family Data"}
         </button>
       )}
-      
     </div>
   );
 };

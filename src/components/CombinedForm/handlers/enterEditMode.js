@@ -2,38 +2,68 @@
 import { doc, getDoc } from "firebase/firestore";
 import { datastore } from "../../../firebase";
 
-export async function enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading) {
-  if (!profile?.editorEmails?.includes(user?.email)) {
-    setWarning("❌ તમને આ ફેમિલી એડિટ કરવાની પરવાનગી નથી.");
-    return;
-  }
-console.log("enter edit mode")
-  setLoading(true);
-  setWarning("");
-
+export async function enterEditMode(
+  profile,
+  user,
+  updateProfile,
+  setMembers,
+  setFormData,
+  setWarning,
+  setLoading,
+  setSelectedMode,
+  setIsEditing
+) {
   try {
-    const familyDocRef = doc(datastore, "families", profile.id);
-    const familySnap = await getDoc(familyDocRef);
+    setLoading(true);
+    setWarning(null);
 
-    if (familySnap.exists()) {
-      const familyData = { id: familySnap.id, ...familySnap.data() };
-      const time = Date.now();
-
-      await updateProfile({ ...familyData, lastUpdateTimestamp: time });
-      setMembers(familyData.members || []);
-      setFormData((s) => ({
-        ...s,
-        nativeCity: familyData.nativeCity || "",
-        currentCity: familyData.currentCity || "",
-      }));
-
-      setWarning("✅ Data refreshed. You are now in EDIT mode.");
-    } else {
-      setWarning("⚠️ Family data not found in Firestore.");
+    if (!profile?.id) {
+      setWarning("⚠️ Family ID missing. Please reload the page.");
+      setLoading(false);
+      return;
     }
-  } catch (err) {
-    console.error("Edit mode error:", err);
-    setWarning("⚠️ Failed to refresh data.");
+
+    // ✅ Fetch full profile data from Firestore
+    const familyRef = doc(datastore, "families", profile.id);
+    const snapshot = await getDoc(familyRef);
+
+    if (!snapshot.exists()) {
+      setWarning("⚠️ Family data not found in database.");
+      setLoading(false);
+      return;
+    }
+
+    const data = snapshot.data();
+
+    // ✅ Update profile state in parent
+    updateProfile({ ...profile, ...data });
+
+    // ✅ Update CityInput form fields
+    setFormData({
+      currentCity: data.currentCity || "",
+      nativeCity: data.nativeCity || "",
+      area: data.area || "",
+      society: data.society || "",
+      building: data.building || "",
+      address: data.address || "",
+      pinCode: data.pinCode || "",
+    });
+
+    // ✅ Update members (for MemberForm)
+    const fetchedMembers = Array.isArray(data.members) ? data.members : [];
+    setMembers(fetchedMembers);
+
+    // ✅ Trigger edit mode (this ensures both forms show)
+    setSelectedMode("edit");
+    setIsEditing(true);
+
+    console.log("✅ Edit mode activated with family data:", {
+      formData: data,
+      members: fetchedMembers,
+    });
+  } catch (error) {
+    console.error("❌ Error entering edit mode:", error);
+    setWarning("Database read failed. Please try again.");
   } finally {
     setLoading(false);
   }

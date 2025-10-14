@@ -4,6 +4,7 @@ import FamilyDirectory  from "../components/FamilyDirectoy";
 import data from "../data/fa.json"; // adjust path if needed
 
 export default function FamilyPage() {
+  console.log("family page")
   return (
     <div className="min-h-screen bg-slate-50">
       <FamilyDirectory
