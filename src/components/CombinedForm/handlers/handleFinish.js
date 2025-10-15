@@ -92,7 +92,7 @@ console.log("handle finish")
     };
     await updateProfile(savedData);
 
-    await localforage.setItem(`profileData_${user.uid}`, savedData);
+    await localforage.setItem(`profileData`, savedData);
     alert(successMessage);
   } catch (err) {
     console.error("Save Error:", err);

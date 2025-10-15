@@ -1,15 +1,4 @@
-// SUMMARY:
-// AuthContext.jsx handles authentication state (login/logout) using React Context API.
-// - Localforage is used for persistent storage to save the "authUser".
-// - Provides `user`, `login`, `logout` globally via AuthProvider.
-// - Supports auto-loading user on app start & keeps state in sync with localforage.
-
-// Remarks (Hinglish):
-// 👉 Yeh context ek global auth manager hai jo user state ko manage karta hai.
-// 👉 Jab user login karega to uska data localforage me store ho jaayega (persistent storage).
-// 👉 Jab logout hoga to state clear ho jaayega aur storage se bhi data remove ho jaayega.
-// 👉 useEffect ensure karta hai ki app reload hone ke baad bhi user login state restore ho jaye.
-// 👉 Agar loading ho rahi hai, to ek simple "Loading..." UI dikhaata hai.
+// src/context/AuthContext.jsx
 
 import { createContext, useContext, useState, useEffect } from "react";
 import localforage from "localforage";
@@ -17,32 +6,54 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 
 const AuthContext = createContext();
-console.log("auth context")
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-    setUser(firebaseUser);
-    setLoading(false);
-  });
-  return unsubscribe;
-}, []);
-  // App start par localforage se user load karna
+  // 🚀 QUICK LOAD FIX: Single useEffect to handle both local cache and Firebase sync
   useEffect(() => {
-    localforage
-      .getItem("authUser")
-      .then((savedUser) => {
-        if (savedUser) {
-          setUser(savedUser);
+    
+    // 1. LocalForage se user data load karna (Fastest check, Promise-based)
+    localforage.getItem("authUser")
+      .then((storedUser) => {
+        if (storedUser) {
+          // Turant user state restore karo (ProfileContext jaldi trigger hoga)
+          setUser(storedUser);
+          // Note: setLoading ko abhi false nahi karna, kyunki Firebase sync pending hai
         }
       })
       .catch((err) => {
         console.error("Auth load error:", err);
       })
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        
+        // 2. Firebase Auth state change ke liye listener set karna
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          
+          // Local state (jo abhi localforage se loaded ho sakta hai) ko Firebase se sync karein
+          if (firebaseUser) {
+            const finalUser = 
+              (user && user.uid === firebaseUser.uid) ? user : { // Local state ko prefer karo agar woh already set hua hai
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName,
+            };
+            setUser(finalUser);
+          } else {
+            // Logged out. State clear karo.
+            setUser(null);
+            localforage.removeItem("authUser");
+          }
+          
+          // CRITICAL: Loading state sirf yahan ek baar band hogi (jab Firebase sync ho jaaye)
+          setLoading(false);
+        });
+
+        return unsubscribe; // Cleanup function
+      });
+      
+  }, []); 
 
   // Login → state + localforage me user save karo
   const login = async (userData) => {
@@ -54,14 +65,17 @@ useEffect(() => {
   const logout = async () => {
     setUser(null);
     await localforage.removeItem("authUser");
+    // Firebase se bhi sign out karna zaruri hai
+    await auth.signOut();
   };
 
   if (loading) {
     return <div className="text-center p-4">Loading...</div>;
   }
 
+  // NOTE: You need to include the 'logout' function in the provider's value if you use it in other components
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,3 +1,5 @@
+// src/utils/loadFamilyProfile.js
+
 import safeLocalForage from "../utils/safeLocalForage";
 import { ref, get } from "firebase/database";
 import { doc, getDoc } from "firebase/firestore";
@@ -15,18 +17,29 @@ export async function loadFamilyProfile(user, updateProfile) {
   // 1️⃣ Try from local cache first
   const cached = await safeLocalForage.getItem(cacheKey);
   if (cached) {
-    console.log("✅ Loaded profile from local cache:", cached);
-    const allKeys = await localforage.keys();
-    
-   console.log("----------------------------------------------------------------");
-    console.log("✅ LOCAL CACHE LOADED (on login/return):", cached); // Simpler log
-    console.log("----------------------------------------------------------------");
+    // 🚀 CLEANUP: Redundant logs ko hata kar sirf ek detailed debug log rakhein
+    try {
+        const allKeys = await localforage.keys();
+        
+        console.log("----------------------------------------------------------------");
+        console.log("✅ LOCAL CACHE LOADED (on login/return):");
+        console.log("   - Active Profile Data:", cached);
+        // User-specific keys showing the debug data
+        console.log("   - All LocalForage Keys (User-specific):", allKeys.filter(k => k.endsWith(`_${user.uid}`))); 
+        console.log("----------------------------------------------------------------");
+    } catch (e) {
+        // Fallback agar keys() function mein koi error aaye
+        console.log("✅ LOCAL CACHE LOADED, but key listing failed:", cached);
+    }
 
     updateProfile(cached);
     return cached;
   }
 
-  console.log("⚙️ No cache found, trying RTDB...");
+  // ⚙️ No cache found, trying RTDB... (Line 29)
+  
+
+  console.log(user?.uid,"⚙️ No cache found, trying RTDB...");
   try {
     // 2️⃣ Try Realtime Database for familySrno
     const srnoRef = ref(db, `users/${user.uid}/familySrno`);

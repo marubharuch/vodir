@@ -12,7 +12,7 @@ export async function loadLocalProfile(userId) {
 
 export async function saveLocalProfile(userId, data) {
   try {
-    await localforage.setItem(`profileData_${userId}`, data);
+    await localforage.setItem(`profileData`, data);
     return true;
   } catch (err) {
     console.error("LocalForage Save Error:", err);
