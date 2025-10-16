@@ -25,7 +25,6 @@ const CombinedForm = () => {
     selectedMode,
     setSelectedMode,
     selectedMemberId,
-    startAddingNewMember ,
     shouldSkipCityInputs,
     isApprovedEditor,
     isViewMode,
@@ -173,16 +172,6 @@ combined form
             />
 
             {/* 🚀 NEW BUTTON: Add New Family Member */}
-            {isEditing && !isEditingCity && selectedMemberId === null && (
-    <div style={{ marginTop: '20px', textAlign: 'center' }}>
-        <button 
-            onClick={startAddingNewMember}
-            className="btn-primary" // Use your actual button styling
-        >
-            ➕ Add New Member
-        </button>
-    </div>
-)}
             {/* Button dikhega agar edit mode mein ho, city edit nahi ho rahi ho, final view mein na ho, aur koi member select na ho. */}
             {isEditing && !isEditingCity && !isFinalView && !selectedMemberId && isUserNonPendingEditor && (
                 <button

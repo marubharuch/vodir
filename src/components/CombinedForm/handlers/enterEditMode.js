@@ -11,6 +11,7 @@ export async function enterEditMode(
   setWarning,
   setLoading,
   setSelectedMode,
+  setIsFinalView,
   setIsEditing
 ) {
   try {
@@ -56,7 +57,7 @@ export async function enterEditMode(
     // ✅ Trigger edit mode (this ensures both forms show)
     setSelectedMode("edit");
     setIsEditing(true);
-
+setIsFinalView(true); 
     console.log("✅ Edit mode activated with family data:", {
       formData: data,
       members: fetchedMembers,

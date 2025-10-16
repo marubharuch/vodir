@@ -64,6 +64,7 @@ const canSaveFamily =
     setSelectedMemberId(null);
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
     // setIsEditing(true) rehta hai, taki MemberList active rahe
+    setIsFinalView(true);
   };
 
   const handleAdd = () => {
@@ -72,8 +73,32 @@ const canSaveFamily =
     
     // Reset form data for next member, but keep city/native
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
+    setIsFinalView(true);
   }
   
+//fdsfsd
+const startAddingNewMember = () => {
+    // 1. Ensure master edit mode is on
+    setIsEditing(true); 
+    
+    // 2. Clear member-specific fields but KEEP the city/location data
+    setFormData(prev => ({ 
+        ...prev, 
+        gender: "", 
+        name: "", 
+        mobile: "",
+    }));
+    
+    // 3. Ensure no existing member is selected for editing
+    setSelectedMemberId(null);
+    
+    // 4. Hide the final "Save Family Data" button while the user is filling the form
+    setIsFinalView(false); 
+    
+    console.log("Starting New Member Entry...");
+};
+
+
   const startEditMember = (id) => { 
     setSelectedMemberId(id);
     setIsEditing(true); // Master edit mode ON
@@ -174,12 +199,13 @@ console.log("handle family save")
     finishAddingMembers,
     // EXISTING HANDLERS
     handleJoinFamily: (srno, mobile) => handleJoinFamily(srno, mobile, user, setWarning, setLoading),
-    enterEditMode: () => enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading, setSelectedMode, setIsEditing),
+    enterEditMode: () => enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading, setSelectedMode, setIsFinalView,setIsEditing),
     handleEditorApproval: (email, approve) => handleEditorApproval(email, approve, profile, updateProfile, setWarning, setLoading),
     toggleMemberPendingStatus: (memberId, pending) => toggleMemberPendingStatus(memberId, pending, profile, updateProfile, setWarning, setLoading, setMembers),
     handleFinish: handleFamilySaveAndReset,
     handleCancelEdit,
     handleAdd,
+    startAddingNewMember,
     startEditMember,
     handleUpdate, 
     deleteMember,
