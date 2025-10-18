@@ -4,6 +4,7 @@ import { datastore } from "../../../firebase";
 
 export async function handleEditorApproval(email, approve, profile, updateProfile, setWarning, setLoading) {
   const isApprovedEditor = profile?.editorEmails?.length && profile.editorEmails.includes(email);
+ console.log("handleEditor approval js")
   if (!isApprovedEditor && !approve) {
     setWarning("⚠️ તમને રિક્વેસ્ટ રદ કરવાની પરવાનગી નથી.");
     return;

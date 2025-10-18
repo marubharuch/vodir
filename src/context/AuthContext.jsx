@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     setUser(null);
     await localforage.removeItem("authUser");
+    await localforage.clear();
     // Firebase se bhi sign out karna zaruri hai
     await auth.signOut();
   };

@@ -28,7 +28,7 @@ const HomePage = () => {
   const { user, logout } = useAuth();
   const { profile } = useProfile();
   const [loading, setLoading] = useState(true);
-
+console.log("home page v-1")
   useEffect(() => {
     if (user !== undefined) {
       setLoading(false);

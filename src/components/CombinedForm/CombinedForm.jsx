@@ -132,7 +132,7 @@ combined form
                     </button>
                     <span className="text-gray-700 text-sm sm:text-base flex-1 text-center">{email}</span>
                     <button
-                      // onClick={() => handleEditorApproval(email, true)}
+                       onClick={() => handleEditorApproval(email, true)}
                       className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700"
                     >
                       Approve
