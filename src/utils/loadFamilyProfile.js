@@ -12,7 +12,7 @@ import localforage from "localforage";
 export async function loadFamilyProfile(user, updateProfile) {
   if (!user?.uid) return null;
 
-  const cacheKey = "profileData"; // 👈 user-specific suffix is auto-handled by safeLocalForage
+  const cacheKey = `profileData_${user.uid}`; // 👈 user-specific suffix is auto-handled by safeLocalForage
 
   // 1️⃣ Try from local cache first
   const cached = await safeLocalForage.getItem(cacheKey);
@@ -54,14 +54,20 @@ export async function loadFamilyProfile(user, updateProfile) {
       const familySnap = await getDoc(familyRef);
 
       if (familySnap.exists()) {
-        const profileData = { id: familySrno, ...familySnap.data() };
+      //  const `profileData_${user.uid}` = { id: familySrno, ...familySnap.data() };
+const newProfileData = { id: familySrno, ...familySnap.data() };
 
+// 2. Define the key string separately (for use in localforage)
+const userCacheKey = `profileData_${user.uid}`;
+
+// 3. Now, you use the key string to save the data in localforage:
+await localforage.setItem(userCacheKey, newProfileData);
         // Save in local cache for next time
-        await safeLocalForage.setItem(cacheKey, profileData);
+        await safeLocalForage.setItem(cacheKey, `profileData_${user.uid}`);
 
-        updateProfile(profileData);
-        console.log("✅ Loaded profile from Firestore:", profileData);
-        return profileData;
+        updateProfile(`profileData_${user.uid}`);
+        console.log("✅ Loaded profile from Firestore:", `profileData_${user.uid}`);
+        return `profileData_${user.uid}`;
       } else {
         console.warn("⚠️ No family found in Firestore for:", familySrno);
       }

@@ -43,7 +43,7 @@ src/context/ProfileContext.jsx
 
 Manages profile state (separate from auth).
 
-Saves/loads data from localForage under key profileData.
+Saves/loads data from localForage under key `profileData_${user.uid}`.
 
 Exposes:
 

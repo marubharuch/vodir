@@ -261,7 +261,7 @@ const [showJoinPopup, setShowJoinPopup] = useState(false);
   const showLocalForageDataModal = async () => {
     // ... (modal logic remains the same) ...
     try {
-      const localForageKey = `profileData_${user.uid}`;
+      const localForageKey = ``profileData_${user.uid}`_${user.uid}`;
       const allData = await localforage.getItem(localForageKey);
       const content = JSON.stringify(allData, null, 2);
       
@@ -880,7 +880,7 @@ const handleFinish = async () => {
     await updateProfile(localDataToSave);
 
     // 💡 READ AND DISPLAY THE SAVED JSON
-    const localForageKey = `profileData_${user.uid}`;
+    const localForageKey = ``profileData_${user.uid}`_${user.uid}`;
     const finalSavedData = await localforage.getItem(localForageKey);
 
     const content = JSON.stringify(finalSavedData, null, 2);

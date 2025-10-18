@@ -63,7 +63,8 @@ const CombinedForm = () => {
 
   // 💡 HELPER: Check if the user is an approved editor (not pending, not just viewer)
   const isUserNonPendingEditor = isApprovedEditor && !isUserPending;
-
+console.log("profile 1",profile)
+//console.log(`Profile for UID: ${user.uid}`, profileData);
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-4 sm:p-6 space-y-6">

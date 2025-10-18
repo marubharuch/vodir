@@ -14,7 +14,7 @@ const SyncButton = () => {
     setLoading(true);
     try {
       // Remove old cache
-      await safeLocalForage.removeItem("profileData");
+      await safeLocalForage.removeItem("`profileData_${user.uid}`");
       // Reload fresh from Firebase
       await loadFamilyProfile(user, updateProfile);
       alert("✅ Data synced successfully!");

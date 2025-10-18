@@ -30,9 +30,10 @@ useEffect(() => {
     setProfile(data);
     if (user) {
       // ✅ FIX: Ab safeLocalForage use karein
-      await safeLocalForage.setItem("profileData", data);
+      
+      await safeLocalForage.setItem(`profileData_${user.uid}`, data);
     } else {
-      await safeLocalForage.removeItem("profileData");
+      await safeLocalForage.removeItem(`profileData_${user.uid}`);
     }
   };
 
