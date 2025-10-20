@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-} from "firebase/auth";
+} from "firebase/auth"; 
 import { auth } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import localforage from "localforage";
@@ -51,6 +51,12 @@ const LoginPage = () => {
       // Store user data locally and update the global auth state
       await localforage.setItem("authUser", userData);
       await login(userData);
+      const storedAuthUser = await localforage.getItem("authUser");
+      console.log("LocalForage 'authUser' after Email Login:", storedAuthUser);
+      // 💡 Also check for the profile key (though it might be null/pending)
+      const profileKey = `profileData_${userData.uid}`;
+      const storedProfile = await localforage.getItem(profileKey);
+      console.log(`LocalForage Profile Data (${profileKey}):`, storedProfile);
 
       alert(`Welcome ${userData.displayName || userData.email}! 🎉 Login successful`);
       navigate("/"); // Navigate to the home page on success

@@ -43,6 +43,7 @@ const CombinedForm = () => {
     handleUpdate,
     handleAdd, 
     handleCancelEdit,
+    handleCloseForm,
     startEditMember,
     deleteMember,
     setShowDataModal,
@@ -210,7 +211,7 @@ combined form
                handleMemberSave={currentHandleSave} 
                selectedMember={members.find(m => m.id === selectedMemberId)} 
                editingId={selectedMemberId} 
-               handleCancelEdit={handleCancelEdit}
+               handleCancelEdit={handleCloseForm}
               />
             )}
             
@@ -249,7 +250,20 @@ combined form
         />
       </div>
 
-      {showJoinPopup && <JoinFamilyPopup onClose={() => setShowJoinPopup(false)} onSubmit={handleJoinFamily} />}
+
+      {showJoinPopup && (
+        <JoinFamilyPopup 
+          onClose={() => setShowJoinPopup(false)} 
+          onSubmit={(srno, mobile) => {
+           handleJoinFamily(srno, mobile, user, setShowJoinPopup, setWarning, setLoading);
+          }}
+          warning={warning} // ⬅️ NEW PROP: Pass the current warning
+          setWarning={setWarning} // ⬅️ NEW PROP: Pass the setter to clear on input
+          loading={loading}
+        />
+      )}
+// ...
+        
     </div>
   );
 };

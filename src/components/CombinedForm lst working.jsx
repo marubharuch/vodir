@@ -1053,7 +1053,7 @@ const handleFinish = async () => {
                       disabled={shouldSkipCityInputs}
                     />
                   </div>
-                  <MemberForm formData={formData} setFormData={setFormData} isJoinMode={true} />
+                  <MemberForm formData={formData} setFormData={setFormData}  />
                   {!shouldSkipCityInputs && (
                     <div className="text-center">
                       <button

@@ -1,8 +1,20 @@
 import React, { useState } from "react";
 
-const JoinFamilyPopup = ({ onClose, onSubmit }) => {
+const JoinFamilyPopup = ({ onClose, onSubmit, warning, setWarning,loading }) => {
   const [srno, setSrno] = useState("");
   const [mobile, setMobile] = useState("");
+
+  const handleSrnoChange = (e) => {
+    setSrno(e.target.value);
+    // Clear the external warning state when the user edits
+    setWarning(""); 
+  };
+
+  const handleMobileChange = (e) => {
+    setMobile(e.target.value);
+    // Clear the external warning state when the user edits
+    setWarning(""); 
+  };
 
   const handleSubmit = () => {
     if (!srno.trim() || !mobile.trim()) {
@@ -18,6 +30,14 @@ const JoinFamilyPopup = ({ onClose, onSubmit }) => {
         <h2 className="text-xl font-bold text-center text-gray-800 mb-4">
           🤝 ફેમિલી જોઈન કરો
         </h2>
+        
+        {/* Display the warning message if one is present */}
+        {warning && (
+          <p className="text-center text-red-500 text-sm mb-3 font-medium">
+            {warning}
+          </p>
+        )}
+        
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -26,7 +46,7 @@ const JoinFamilyPopup = ({ onClose, onSubmit }) => {
             <input
               type="number"
               value={srno}
-              onChange={(e) => setSrno(e.target.value)}
+              onChange={handleSrnoChange}
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-400"
               placeholder="દા.ત. 1001"
             />
@@ -38,7 +58,7 @@ const JoinFamilyPopup = ({ onClose, onSubmit }) => {
             <input
               type="number"
               value={mobile}
-              onChange={(e) => setMobile(e.target.value)}
+              onChange={handleMobileChange}
               className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-400"
               placeholder="દા.ત. 9876543210"
             />
@@ -48,6 +68,7 @@ const JoinFamilyPopup = ({ onClose, onSubmit }) => {
         <div className="flex justify-end gap-3 mt-5">
           <button
             onClick={onClose}
+            disabled={loading}
             className="px-4 py-2 rounded-lg bg-gray-300 text-gray-700 font-semibold hover:bg-gray-400"
           >
             Cancel

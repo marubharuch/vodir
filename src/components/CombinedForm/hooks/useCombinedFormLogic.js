@@ -110,6 +110,42 @@ const startAddingNewMember = () => {
     }
   };
   
+
+// Add this helper function inside the component function
+const handleClearForm = () => {
+    setFormData(s => ({
+        ...s,
+        gender: "",
+        name: "",
+        countryCode: "+91",
+        mobile: ""
+    }));
+};
+const handleCloseForm = () => {
+    // 1. Exit master edit mode (Hides the MemberForm component)
+    setIsEditing(isViewMode); // If in view mode, stay editing true if members exist, else false.
+    
+    // Simpler: Just turn off editing and hide the form, let the parent decide if it should re-open.
+    // For now, let's keep the original flow:
+    setIsEditing(false); 
+    
+    // 2. Clear any active member editing selection
+    setSelectedMemberId(null); 
+    
+    // 3. Clear the form data for a new entry (resets member-specific fields)
+    setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
+    
+    // 4. Hide the final 'Save Family Data' view
+    setIsFinalView(false); 
+    
+    // 5. If we were in the process of creating a family and cancelled, go back to the choice screen
+    if (selectedMode === "create") {
+      setSelectedMode(null);
+    }
+    
+    // 6. Ensure City edit is also off if it was on
+    setIsEditingCity(false);
+};
   const handleCancelEdit = () => {
     setIsEditing(false);
     setSelectedMemberId(null);
@@ -198,12 +234,14 @@ console.log("handle family save")
     handleCitySave,
     finishAddingMembers,
     // EXISTING HANDLERS
-    handleJoinFamily: (srno, mobile) => handleJoinFamily(srno, mobile, user, setWarning, setLoading),
+    handleJoinFamily: (srno, mobile) => handleJoinFamily(srno, mobile, user, setShowJoinPopup,setWarning, setLoading),
     enterEditMode: () => enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading, setSelectedMode, setIsFinalView,setIsEditing),
-    handleEditorApproval: (email, approve) => handleEditorApproval(email, approve, profile, updateProfile, setWarning, setLoading),
+    handleEditorApproval: (email, approve) => handleEditorApproval(email, approve, profile, user, updateProfile, setWarning, setLoading),
     toggleMemberPendingStatus: (memberId, pending) => toggleMemberPendingStatus(memberId, pending, profile, updateProfile, setWarning, setLoading, setMembers),
     handleFinish: handleFamilySaveAndReset,
     handleCancelEdit,
+    handleCloseForm,
+    handleClearForm,    
     handleAdd,
     startAddingNewMember,
     startEditMember,

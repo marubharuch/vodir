@@ -14,6 +14,8 @@ export async function handleEditorApproval(email, approve, profile, updateProfil
 
   setLoading(true);
   try {
+
+    
     const familiesRef = doc(datastore, "families", profile.id);
     let updatedEditors = [...(profile.editorEmails || [])];
     let updatedPending = [...(profile.pendingEditorEmails || [])];
