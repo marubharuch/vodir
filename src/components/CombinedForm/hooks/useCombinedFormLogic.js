@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react"; 
 import { useProfile } from "../../../context/ProfileContext";
 import { useAuth } from "../../../context/AuthContext";
 import { handleJoinFamily } from "../handlers/handleJoinFamily";
@@ -10,6 +10,10 @@ import { toggleMemberPendingStatus } from "../utils/familyHelpers";
 export function useCombinedFormLogic() {
   const { profile, updateProfile } = useProfile();
   const { user } = useAuth();
+
+  // 🚀 STATES FOR CHANGE TRACKING
+  const [originalMembers, setOriginalMembers] = useState(null);
+  const [originalCityData, setOriginalCityData] = useState(null);
 
   const [members, setMembers] = useState([]);
   const [formData, setFormData] = useState({
@@ -25,7 +29,7 @@ export function useCombinedFormLogic() {
   // 🚀 NEW STATES FOR STEP-BY-STEP FLOW
   const [isFinalView, setIsFinalView] = useState(false); // Controls Final Save button visibility
   const [isEditingCity, setIsEditingCity] = useState(false); // CityInputs ka view/edit mode
-  // END OF NEW STATES
+  const [showMemberFormModal, setShowMemberFormModal] = useState(false); // ⬅️ ADDED: Modal visibility state
 
   const [joinSrno, setJoinSrno] = useState("");
   const [warning, setWarning] = useState("");
@@ -41,15 +45,66 @@ export function useCombinedFormLogic() {
   const isViewMode = profile?.id && !isEditing;
   const isApprovedEditor = profile?.editorEmails?.includes(user?.email);
   const isUserPending = members.some((m) => m.userId === user?.uid && m.pending === true);
-  //const canSaveFamily = !!formData.name && !!formData.mobile;
-const canSaveFamily = 
-  members.length > 0 && 
-  (formData.nativeCity || "").trim().length > 0 && 
-  (formData.currentCity || "").trim().length > 0;
+
+  const canSaveFamily = 
+    members.length > 0 && 
+    (formData.nativeCity || "").trim().length > 0 && 
+    (formData.currentCity || "").trim().length > 0;
   const [selectedMemberId, setSelectedMemberId] = useState(null);
 
+  // 💡 HELPER FUNCTION: Get the current city data for comparison
+  const getCurrentCityData = () => ({
+      nativeCity: formData.nativeCity,
+      currentCity: formData.currentCity,
+  });
+
   // -------------------------------------------------------------
-  // 🚀 MODIFIED/NEW CORE FUNCTIONS FOR THE NEW FLOW
+  // 3. useEffect: CAPTURE ORIGINAL STATE (For Change Tracking)
+  // -------------------------------------------------------------
+  useEffect(() => {
+      // CAPTURE ORIGINAL DATA: when entering edit mode
+      if (isEditing && profile?.id && originalMembers === null) {
+          // Deep clone and sort members array for consistent comparison
+          const initialMembers = JSON.parse(JSON.stringify(members));
+          initialMembers.sort((a, b) => (a.id > b.id) ? 1 : -1);
+
+          setOriginalMembers(initialMembers);
+          setOriginalCityData(getCurrentCityData());
+      }
+      
+      // RESET ORIGINAL DATA: when editing is turned off
+      if (!isEditing && originalMembers !== null) {
+          setOriginalMembers(null);
+          setOriginalCityData(null);
+      }
+      
+  }, [isEditing, profile, members, formData.nativeCity, formData.currentCity, originalMembers]);
+
+  // -------------------------------------------------------------
+  // 4. useMemo: CALCULATE HAS CHANGES
+  // -------------------------------------------------------------
+  const hasChanges = useMemo(() => {
+      if (!originalMembers || !originalCityData) return false;
+
+      // Deep clone and sort current members array for comparison
+      const currentMembers = JSON.parse(JSON.stringify(members));
+      currentMembers.sort((a, b) => (a.id > b.id) ? 1 : -1);
+      
+      // Compare members array (after sorting)
+      const membersChanged = JSON.stringify(originalMembers) !== JSON.stringify(currentMembers);
+      
+      // Compare city data
+      const currentCityJSON = JSON.stringify(getCurrentCityData());
+      const originalCityJSON = JSON.stringify(originalCityData);
+      const cityChanged = currentCityJSON !== originalCityJSON;
+
+      return membersChanged || cityChanged;
+      
+  }, [members, originalMembers, formData.nativeCity, formData.currentCity, originalCityData]);
+
+
+  // -------------------------------------------------------------
+  // 🚀 CORE FUNCTIONS
   // -------------------------------------------------------------
 
   const handleUpdate = () => {
@@ -60,11 +115,11 @@ const canSaveFamily =
                 : member
         )
     );
-    // Reset member form fields after update
+    // Reset member form fields after update and close modal
     setSelectedMemberId(null);
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
-    // setIsEditing(true) rehta hai, taki MemberList active rahe
     setIsFinalView(true);
+    setShowMemberFormModal(false); // ⬅️ Close modal
   };
 
   const handleAdd = () => {
@@ -74,10 +129,10 @@ const canSaveFamily =
     // Reset form data for next member, but keep city/native
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
     setIsFinalView(true);
+    setShowMemberFormModal(false); // ⬅️ Close modal
   }
   
-//fdsfsd
-const startAddingNewMember = () => {
+  const startAddingNewMember = () => {
     // 1. Ensure master edit mode is on
     setIsEditing(true); 
     
@@ -92,17 +147,17 @@ const startAddingNewMember = () => {
     // 3. Ensure no existing member is selected for editing
     setSelectedMemberId(null);
     
-    // 4. Hide the final "Save Family Data" button while the user is filling the form
+    // 4. Show modal
     setIsFinalView(false); 
-    
-    console.log("Starting New Member Entry...");
-};
+    setShowMemberFormModal(true); // ⬅️ Open modal
+  };
 
 
   const startEditMember = (id) => { 
     setSelectedMemberId(id);
     setIsEditing(true); // Master edit mode ON
-    setIsFinalView(false); // Agar final view mein the, toh bahar niklo
+    setIsFinalView(false); // Exit final view to show the form
+    setShowMemberFormModal(true); // ⬅️ Open modal
     // Load member data into formData
     const memberToEdit = members.find(m => m.id === id);
     if (memberToEdit) {
@@ -111,46 +166,55 @@ const startAddingNewMember = () => {
   };
   
 
-// Add this helper function inside the component function
-const handleClearForm = () => {
-    setFormData(s => ({
-        ...s,
-        gender: "",
-        name: "",
-        countryCode: "+91",
-        mobile: ""
-    }));
-};
-const handleCloseForm = () => {
-    // 1. Exit master edit mode (Hides the MemberForm component)
-    setIsEditing(isViewMode); // If in view mode, stay editing true if members exist, else false.
+  const handleClearForm = () => {
+      setFormData(s => ({
+          ...s,
+          gender: "",
+          name: "",
+          countryCode: "+91",
+          mobile: ""
+      }));
+  };
+  
+  // 💡 NEW HANDLER: For the MemberForm's "Cancel" button (રદ કરો)
+  const handleCancelMemberForm = () => {
+    // 1. Keep master edit mode ON.
     
-    // Simpler: Just turn off editing and hide the form, let the parent decide if it should re-open.
-    // For now, let's keep the original flow:
-    setIsEditing(false); 
-    
-    // 2. Clear any active member editing selection
+    // 2. Clear any active member editing selection (This closes the MemberForm UI)
     setSelectedMemberId(null); 
     
-    // 3. Clear the form data for a new entry (resets member-specific fields)
+    // 3. Clear the form data to ensure partially entered data is gone.
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
     
-    // 4. Hide the final 'Save Family Data' view
+    // 4. Close modal and ensure we return to the list view
     setIsFinalView(false); 
-    
-    // 5. If we were in the process of creating a family and cancelled, go back to the choice screen
+    setShowMemberFormModal(false); // ⬅️ Close modal
+  };
+  
+  // This is the old, unused handler that fully exits editing.
+  const handleCloseForm = () => {
+    setIsEditing(false); 
+    setSelectedMemberId(null); 
+    setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
+    setIsFinalView(false); 
     if (selectedMode === "create") {
       setSelectedMode(null);
     }
-    
-    // 6. Ensure City edit is also off if it was on
     setIsEditingCity(false);
-};
+  };
+  
+  // 5. MODIFIED: handleCancelEdit to reset change tracking (Used by the FINAL "Cancel" button)
   const handleCancelEdit = () => {
+    // Revert view states
     setIsEditing(false);
     setSelectedMemberId(null);
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
-    // Agar create mode mein the aur cancel kiya, toh wapas choice screen par le jao.
+    
+    // 💡 IMPORTANT: Reset the original states to force a clean re-capture next time
+    setOriginalMembers(null);
+    setOriginalCityData(null);
+    
+    // If in create mode and canceled, go back to the choice screen
     if (selectedMode === "create") {
       setSelectedMode(null);
     }
@@ -168,7 +232,6 @@ const handleCloseForm = () => {
   const handleCitySave = () => {
     // City data already formData mein save ho chuka hai (via onChange)
     setIsEditingCity(false);
-    // Agar hum create mode mein hain aur members nahi hain, toh ab member form visible hoga.
   };
 
   const finishAddingMembers = () => {
@@ -182,13 +245,16 @@ const handleCloseForm = () => {
   const handleFamilySaveAndReset = async () => {
     // Execute the external save logic which calls updateProfile on success
     const success = await handleFinish(profile, user, updateProfile, members, formData, setMembers, setWarning, setLoading);
-console.log("handle family save")
+
     // Assuming the imported handler returns something truthy on success
     if (success !== false) { 
         // ✅ CRITICAL FIXES: Reset local states to force transition to FamilySummaryView
         setIsEditing(false); 
         setIsFinalView(false);
         setSelectedMode(null); 
+        // Also reset change tracking data upon successful save
+        setOriginalMembers(null);
+        setOriginalCityData(null);
     }
     return success;
 };
@@ -230,17 +296,22 @@ console.log("handle family save")
     setIsFinalView,
     isEditingCity,
     setIsEditingCity,
-    startCityEdit,
-    handleCitySave,
-    finishAddingMembers,
+    // ⬅️ FIX: Add missing functions to the return object
+    startCityEdit, // ⬅️ CRITICAL FIX: Missing function added
+    handleCitySave, // ⬅️ Missing function added
+    finishAddingMembers, // ⬅️ Missing function added
+    showMemberFormModal, // ⬅️ Missing state added
+    // 💡 NEW RETURN: The calculated change status
+    hasChanges,
     // EXISTING HANDLERS
     handleJoinFamily: (srno, mobile) => handleJoinFamily(srno, mobile, user, setShowJoinPopup,setWarning, setLoading),
     enterEditMode: () => enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading, setSelectedMode, setIsFinalView,setIsEditing),
     handleEditorApproval: (email, approve) => handleEditorApproval(email, approve, profile, user, updateProfile, setWarning, setLoading),
     toggleMemberPendingStatus: (memberId, pending) => toggleMemberPendingStatus(memberId, pending, profile, updateProfile, setWarning, setLoading, setMembers),
     handleFinish: handleFamilySaveAndReset,
-    handleCancelEdit,
-    handleCloseForm,
+    handleCancelEdit, // FINAL 'Cancel' button handler (resets everything)
+    handleCloseForm,  // Old handler (not used now)
+    handleCancelMemberForm, 
     handleClearForm,    
     handleAdd,
     startAddingNewMember,

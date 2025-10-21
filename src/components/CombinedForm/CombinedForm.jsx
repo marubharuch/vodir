@@ -21,11 +21,10 @@ const CombinedForm = () => {
     setLoading,
     isEditing,
     setIsEditing,
-    setIsFinalView,
     selectedMode,
     setSelectedMode,
     selectedMemberId,
-    startAddingNewMember ,
+    startAddingNewMember,
     shouldSkipCityInputs,
     isApprovedEditor,
     isViewMode,
@@ -35,62 +34,51 @@ const CombinedForm = () => {
     localForageDataModalContent,
     showJoinPopup,
     setShowJoinPopup,
+    setShowDataModal,
+    isFinalView,
+    setIsFinalView,
+    isEditingCity,
+    setIsEditingCity,
     handleJoinFamily,
     enterEditMode,
     handleEditorApproval,
     toggleMemberPendingStatus,
     handleFinish,
     handleUpdate,
-    handleAdd, 
-    handleCancelEdit,
-    handleCloseForm,
+    handleAdd,
     startEditMember,
     deleteMember,
-    setShowDataModal,
-    
-    // NEW FETCHED STATES/FUNCTIONS
-    isFinalView,
-    isEditingCity,
-    setIsEditingCity,
     startCityEdit,
     handleCitySave,
     finishAddingMembers,
+    showMemberFormModal,
+    handleCancelMemberForm,
   } = useCombinedFormLogic();
 
-  // 💡 HELPER: Check if city fields have been filled to allow adding members
-  const isCityDataEntered = (formData.nativeCity || "").trim().length > 0 && (formData.currentCity || "").trim().length > 0;
-  
+  const isCityDataEntered =
+    (formData.nativeCity || "").trim().length > 0 &&
+    (formData.currentCity || "").trim().length > 0;
+
   const currentHandleSave = selectedMemberId ? handleUpdate : handleAdd;
 
-  // 💡 HELPER: Check if the user is an approved editor (not pending, not just viewer)
   const isUserNonPendingEditor = isApprovedEditor && !isUserPending;
-console.log("profile 1",profile)
-//console.log(`Profile for UID: ${user.uid}`, profileData);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-4 sm:p-6 space-y-6">
-combined form
-        {/* View Mode */}
+
+        {/* ✅ View Mode */}
         {user && isViewMode && (
           <FamilySummaryView
             profile={profile}
             user={user}
             members={members}
-            setMembers={setMembers}
-            setFormData={setFormData}
-            setWarning={setWarning}
-            setLoading={setLoading}
-            setSelectedMode={setSelectedMode}
-            setIsEditing={setIsEditing}
             enterEditMode={enterEditMode}
-            loading={loading}
-            isUserNonPendingEditor={isUserNonPendingEditor} // Changed from isApprovedEditor
-            isUserPending={isUserPending}
-            // other props...
+            isUserNonPendingEditor={isUserNonPendingEditor}
           />
         )}
 
-        {/* Choice Screen: Only show if no profile AND no mode selected */}
+        {/* ✅ Initial Choice Screen */}
         {user && !profile?.id && selectedMode === null && !loading && (
           <div className="text-center space-y-6">
             <h2 className="text-xl sm:text-2xl font-bold text-gray-800">શું કરવા માંગો છો?</h2>
@@ -102,10 +90,10 @@ combined form
                 🤝 ફેમિલી જોઈન કરો
               </button>
               <button
-                 onClick={() => {
+                onClick={() => {
                   setSelectedMode("create");
                   setIsEditing(true);
-                  setIsEditingCity(true); // STEP 1: City Input Form se shuru karo
+                  setIsEditingCity(true);
                   setIsFinalView(false);
                 }}
                 className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-indigo-700"
@@ -116,25 +104,27 @@ combined form
           </div>
         )}
 
-        {/* Pending Editor Requests */}
+        {/* ✅ Pending Editor Approval Section */}
         {profile?.id &&
-          isApprovedEditor && // Use isApprovedEditor to check if current user can approve/reject
+          isApprovedEditor &&
           Array.isArray(profile.pendingEditorEmails) &&
           profile.pendingEditorEmails.length > 0 && (
             <div className="p-4 border border-blue-300 bg-blue-50 rounded-xl">
               <h3 className="text-lg font-semibold text-blue-700 mb-2">🖊️ Pending Editor Requests</h3>
               <ul className="space-y-2">
                 {profile.pendingEditorEmails.map((email) => (
-                  <li key={email} className="flex justify-between items-center bg-white border rounded-md p-2">
-                    <button
-                      // onClick={() => handleEditorApproval(email, false)}
-                      className="bg-red-600 text-white text-sm px-3 py-1 rounded hover:bg-red-700"
-                    >
+                  <li
+                    key={email}
+                    className="flex justify-between items-center bg-white border rounded-md p-2"
+                  >
+                    <button className="bg-red-600 text-white text-sm px-3 py-1 rounded hover:bg-red-700">
                       Reject
                     </button>
-                    <span className="text-gray-700 text-sm sm:text-base flex-1 text-center">{email}</span>
+                    <span className="text-gray-700 text-sm sm:text-base flex-1 text-center">
+                      {email}
+                    </span>
                     <button
-                       onClick={() => handleEditorApproval(email, true)}
+                      onClick={() => handleEditorApproval(email, true)}
                       className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700"
                     >
                       Approve
@@ -145,125 +135,117 @@ combined form
             </div>
           )}
 
-
-        {/* Join / Create / Edit Form: Only show if a mode is selected */}
+        {/* ✅ Join / Create / Edit Form */}
         {user && !isViewMode && selectedMode !== null && (
           <div className="space-y-6">
-            
-            {/* 1. City Inputs (Shows Label or Input based on isEditingCity) */}
-            {!shouldSkipCityInputs && (
-                <CityInputs
-                    formData={formData}
-                    setFormData={setFormData}
-                    isEditing={isEditing}
-                    isEditingCity={isEditingCity}
-                    setIsEditingCity={setIsEditingCity}
-                    handleCitySave={handleCitySave}
-                    startCityEdit={startCityEdit}
-                />
-            )}
-            
-            {/* 2. Member List (Shows data as labels) */}
-            <MemberList
-                members={members}
-                loading={loading}
-                isEditing={isEditing && !isFinalView} // Edit buttons show if master edit is on and not in final view
-                isApprovedEditor={isApprovedEditor}
-                startEditMember={startEditMember}
-                deleteMember={deleteMember}
-                toggleMemberPendingStatus={toggleMemberPendingStatus}
-            />
 
-            {/* 🚀 NEW BUTTON: Add New Family Member */}
-            {isEditing && !isEditingCity && selectedMemberId === null && (
-    <div style={{ marginTop: '20px', textAlign: 'center' }}>
-        <button 
-            onClick={startAddingNewMember}
-            className="btn-primary" // Use your actual button styling
-        >
-            ➕ Add New Member
-        </button>
-    </div>
-)}
-            {/* Button dikhega agar edit mode mein ho, city edit nahi ho rahi ho, final view mein na ho, aur koi member select na ho. */}
-            {isEditing && !isEditingCity && !isFinalView && !selectedMemberId && isUserNonPendingEditor && (
-                <button
-                    onClick={handleCancelEdit} // handleCancelEdit sets selectedMemberId(null) and clears the form
-                    disabled={loading}
-                    className={`
-                        mt-4 w-full px-4 py-3 rounded-lg font-semibold shadow transition
-                        ${loading
-                            ? 'bg-gray-400 cursor-not-allowed' 
-                            : 'bg-green-600 text-white hover:bg-green-700'
-                        }
-                    `}
-                >
-                    ➕ Add New Family Member
-                </button>
-            )}
-            
-            {/* 3. Member Form: Visibility Condition Updated */}
-            {/* Ab MemberForm dikhega agar: City Data entered ho AND City edit na ho rahi ho AND master edit mode ON ho AND final view na ho. */}
-            {isCityDataEntered && !isEditingCity && isEditing && !isFinalView && (
-              <MemberForm 
-               formData={formData}
-               setFormData={setFormData} 
-               handleMemberSave={currentHandleSave} 
-               selectedMember={members.find(m => m.id === selectedMemberId)} 
-               editingId={selectedMemberId} 
-               handleCancelEdit={handleCloseForm}
+            {/* 1. City Inputs */}
+            {!shouldSkipCityInputs && (
+              <CityInputs
+                formData={formData}
+                setFormData={setFormData}
+                isEditing={isEditing}
+                isEditingCity={isEditingCity}
+                setIsEditingCity={setIsEditingCity}
+                handleCitySave={handleCitySave}
+                startCityEdit={startCityEdit}
               />
             )}
-            
-            {/* 4. 'Finish Adding' button (Show after first member, if not in final view) */}
-            {(selectedMode === "create" && members.length > 0 && !isFinalView && !selectedMemberId && !isEditingCity) && (
-                 <button
-                    onClick={finishAddingMembers}
-                    className="w-full bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold shadow hover:bg-yellow-700"
-                  >
-                    Finish Adding Members
-                </button>
-            )}
 
-            {/* 5. Final Save Button (isFinalView) */}
-            {isFinalView && (
-                <div className="text-center mt-8">
-                    <h3 className="text-xl font-semibold text-green-700 mb-4">✅ Family Data Ready!</h3>
-                    <button
-                        onClick={handleFinish}
-                        disabled={!canSaveFamily || loading} 
-                        className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-green-700 transition"
-                    >
-                        💾 Save Family Data
-                    </button>
+            {/* 2. Member List */}
+            <MemberList
+              members={members}
+              loading={loading}
+              isEditing={isEditing && !isFinalView && !showMemberFormModal}
+              isApprovedEditor={isApprovedEditor}
+              startEditMember={startEditMember}
+              deleteMember={deleteMember}
+              toggleMemberPendingStatus={toggleMemberPendingStatus}
+            />
+
+            {/* 3. Add New Member Button */}
+            {isEditing &&
+              isCityDataEntered &&
+              !isEditingCity &&
+              !isFinalView &&
+              !showMemberFormModal && (
+                <div className="mt-5 text-center">
+                  <button
+                    onClick={startAddingNewMember}
+                    className="w-full bg-green-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
+                  >
+                    ➕ Add New Member
+                  </button>
                 </div>
+              )}
+
+            {/* 4. Finish Adding Members */}
+            {selectedMode === "create" &&
+              members.length > 0 &&
+              !isFinalView &&
+              !showMemberFormModal &&
+              !isEditingCity && (
+                <button
+                  onClick={finishAddingMembers}
+                  className="w-full bg-yellow-600 text-white px-4 py-3 rounded-lg font-bold shadow hover:bg-yellow-700"
+                >
+                  Finish Adding Members
+                </button>
+              )}
+
+            {/* 5. Final Save Button */}
+            {isFinalView && (
+              <div className="text-center mt-8">
+                <h3 className="text-xl font-semibold text-green-700 mb-4">✅ Family Data Ready!</h3>
+                <button
+                  onClick={handleFinish}
+                  disabled={!canSaveFamily || loading}
+                  className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-green-700 transition"
+                >
+                  💾 Save Family Data
+                </button>
+              </div>
             )}
           </div>
         )}
-        
-        {warning && <p className="text-center text-red-500 font-medium">{warning}</p>}
 
+        {/* ✅ Member Form Modal (CRITICAL FIX: Changed prop name) */}
+        {showMemberFormModal && (
+          <MemberForm
+            // FIX: onClose prop is not used by MemberForm.jsx. It expects handleCancelEdit.
+            handleCancelEdit={handleCancelMemberForm} // ⬅️ Corrected Prop Name
+            formData={formData}
+            setFormData={setFormData}
+            handleMemberSave={currentHandleSave}
+            selectedMember={members.find((m) => m.id === selectedMemberId)}
+            editingId={selectedMemberId}
+          />
+        )}
+
+        {/* ✅ Warning Message */}
+        {warning && (
+          <p className="text-center text-red-500 font-medium">{warning}</p>
+        )}
+
+        {/* ✅ LocalForage Modal */}
         <LocalForageDataModal
           show={showDataModal}
           content={localForageDataModalContent}
-          //...
         />
+
+        {/* ✅ Join Family Popup */}
+        {showJoinPopup && (
+          <JoinFamilyPopup
+            onClose={() => setShowJoinPopup(false)}
+            onSubmit={(srno, mobile) =>
+              handleJoinFamily(srno, mobile, user, setShowJoinPopup, setWarning, setLoading)
+            }
+            warning={warning}
+            setWarning={setWarning}
+            loading={loading}
+          />
+        )}
       </div>
-
-
-      {showJoinPopup && (
-        <JoinFamilyPopup 
-          onClose={() => setShowJoinPopup(false)} 
-          onSubmit={(srno, mobile) => {
-           handleJoinFamily(srno, mobile, user, setShowJoinPopup, setWarning, setLoading);
-          }}
-          warning={warning} // ⬅️ NEW PROP: Pass the current warning
-          setWarning={setWarning} // ⬅️ NEW PROP: Pass the setter to clear on input
-          loading={loading}
-        />
-      )}
-// ...
-        
     </div>
   );
 };

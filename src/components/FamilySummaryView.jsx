@@ -19,7 +19,7 @@ const FamilySummaryView = ({
   if (!profile?.id) return null;
 
   const creator = members.find((m) => m.userId === profile.createdBy)?.name || "N/A";
-console.log("family summary")
+console.log("family summary",members)
   return (
     <div className="p-4 border rounded-lg shadow bg-white">
       
@@ -36,7 +36,7 @@ console.log("family summary")
       </div>
 
       <h3 className="text- font-bold text-indigo-700 mb-1">👥 MEMBERS</h3>
-      {members.map((m) => (
+      {profile.members.map((m) => (
         <div key={m.id} className={`p-2 mb-1 border rounded ${m.pending ? "bg-yellow-100" : "bg-gray-50"}`}>
           <strong>{m.name}</strong> ({m.countryCode} {m.mobile})
           {m.pending && <span className="ml-2 text-xs text-red-600">⏳ Pending</span>}
