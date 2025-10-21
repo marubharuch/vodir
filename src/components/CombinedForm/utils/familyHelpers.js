@@ -8,30 +8,47 @@ export async function handleUpdateFamily(
   currentUserEmail,
   profile,
   formData,
-  userIndexRef,
+  userIndexRef, // This is unused, but we'll keep it for function signature integrity
   familiesRef,
   successMessageCallback,
   setLoadingCallback
 ) {
   try {
-    const finalPayload = {
+    // 1. Construct the minimal update payload only with fields that are changing.
+    // We explicitly include members, nativeCity, and currentCity.
+    const updateFields = {
+      members: members,
       nativeCity: formData.nativeCity,
       currentCity: formData.currentCity,
-      members,
       updatedAt: serverTimestamp(),
+      // We explicitly include editorEmails and pendingEditorEmails ONLY IF they
+      // have changed, but in this context, we'll assume they are stable
+      // or managed elsewhere, and just update the main data points.
+      // If we *must* ensure they are in the payload:
       editorEmails: profile.editorEmails || [],
       pendingEditorEmails: profile.pendingEditorEmails || [],
-      createdBy: profile.createdBy,
-      createdAt: profile.createdAt,
     };
+    
+    // IMPORTANT: DO NOT include 'createdBy' and 'createdAt' in the update payload.
+    // They are static fields and should not be updated. updateDoc will automatically
+    // leave them alone if they are not included in the payload.
 
-    await updateDoc(doc(familiesRef, familyIdToSave), finalPayload);
+    await updateDoc(doc(familiesRef, familyIdToSave), updateFields);
+    
     successMessageCallback(`✅ Family ${familyIdToSave} updated successfully!`);
-    return { finalFamilyPayload: finalPayload };
+    
+    // The members and city updates are now correctly included in the Firestore call.
+    return { 
+        updatedFields: updateFields,
+        // For local profile update, you'd want to merge the new data with the old profile
+        // but here we just return the fields that were updated in the DB
+    }; 
   } catch (err) {
     console.error("Update Family Error:", err);
     throw err;
   } finally {
+    // The loading status should be handled by the caller (handleFinish.js)
+    // but since the original code had it here, we'll keep it.
     setLoadingCallback(false);
   }
 }

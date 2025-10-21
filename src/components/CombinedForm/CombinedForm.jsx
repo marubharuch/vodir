@@ -53,6 +53,7 @@ const CombinedForm = () => {
     finishAddingMembers,
     showMemberFormModal,
     handleCancelMemberForm,
+    hasChanges,
   } = useCombinedFormLogic();
 
   const isCityDataEntered =

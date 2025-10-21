@@ -83,26 +83,49 @@ export function useCombinedFormLogic() {
   // -------------------------------------------------------------
   // 4. useMemo: CALCULATE HAS CHANGES
   // -------------------------------------------------------------
-  const hasChanges = useMemo(() => {
-      if (!originalMembers || !originalCityData) return false;
+const hasChanges = useMemo(() => {
+    // 1. Initial/New Family Check
+    console.log("Original Members:", originalMembers);
+    console.log("Current Members:", members);
+    console.log("Members Changed:", membersChanged);
+    console.log("City Changed:", cityChanged);
+    console.log("Has Changes:", membersChanged || cityChanged);
+    if (!originalMembers || !originalCityData || !profile?.id) {
+        return true; 
+    }
 
-      // Deep clone and sort current members array for comparison
-      const currentMembers = JSON.parse(JSON.stringify(members));
-      currentMembers.sort((a, b) => (a.id > b.id) ? 1 : -1);
-      
-      // Compare members array (after sorting)
-      const membersChanged = JSON.stringify(originalMembers) !== JSON.stringify(currentMembers);
-      
-      // Compare city data
-      const currentCityJSON = JSON.stringify(getCurrentCityData());
-      const originalCityJSON = JSON.stringify(originalCityData);
-      const cityChanged = currentCityJSON !== originalCityJSON;
+    // --- City Data Comparison (Assuming originalCityData holds { nativeCity, currentCity }) ---
+    const cityChanged = (
+        formData.nativeCity !== originalCityData.nativeCity ||
+        formData.currentCity !== originalCityData.currentCity
+    );
 
-      return membersChanged || cityChanged;
-      
-  }, [members, originalMembers, formData.nativeCity, formData.currentCity, originalCityData]);
+    // --- Members Array Comparison (Deep & Sorted) ---
+    const currentMembers = JSON.parse(JSON.stringify(members));
+    
+    // यह लाइन 104 पर थी, अब इसे सुरक्षित (safe) बना दिया गया है।
+    currentMembers.sort((a, b) => 
+        (a.id?.toString() || '').localeCompare(b.id?.toString() || '') 
+    ); 
 
+    // Note: originalMembers should also be sorted exactly the same way when it is set initially
+    // to ensure a valid comparison. If originalMembers is already sorted, you don't need to sort it again.
+    // However, to be safe, if originalMembers is not guaranteed to be sorted, you might need to sort it too 
+    // before comparison, or ensure it was sorted exactly the same way before being set as state.
 
+    const membersChanged = JSON.stringify(originalMembers) !== JSON.stringify(currentMembers);
+
+    // --- Final Result ---
+    return membersChanged || cityChanged;
+    
+}, [
+    members,
+    originalMembers,
+    formData.nativeCity,
+    formData.currentCity,
+    originalCityData,
+    profile?.id
+]);
   // -------------------------------------------------------------
   // 🚀 CORE FUNCTIONS
   // -------------------------------------------------------------
@@ -302,7 +325,7 @@ export function useCombinedFormLogic() {
     finishAddingMembers, // ⬅️ Missing function added
     showMemberFormModal, // ⬅️ Missing state added
     // 💡 NEW RETURN: The calculated change status
-    hasChanges,
+    
     // EXISTING HANDLERS
     handleJoinFamily: (srno, mobile) => handleJoinFamily(srno, mobile, user, setShowJoinPopup,setWarning, setLoading),
     enterEditMode: () => enterEditMode(profile, user, updateProfile, setMembers, setFormData, setWarning, setLoading, setSelectedMode, setIsFinalView,setIsEditing),
