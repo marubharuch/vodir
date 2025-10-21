@@ -167,12 +167,12 @@ const CombinedForm = () => {
             {isEditing &&
               isCityDataEntered &&
               !isEditingCity &&
-              !isFinalView &&
+             // !isFinalView &&
               !showMemberFormModal && (
                 <div className="mt-5 text-center">
                   <button
                     onClick={startAddingNewMember}
-                    className="w-full bg-green-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
+                    className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
                   >
                     ➕ Add New Member
                   </button>
@@ -194,15 +194,18 @@ const CombinedForm = () => {
               )}
 
             {/* 5. Final Save Button */}
-            {isFinalView && (
+            {isEditing &&
+              isCityDataEntered &&
+              !isEditingCity &&
+             // !isFinalView &&
+              !showMemberFormModal && (
               <div className="text-center mt-8">
-                <h3 className="text-xl font-semibold text-green-700 mb-4">✅ Family Data Ready!</h3>
                 <button
                   onClick={handleFinish}
                   disabled={!canSaveFamily || loading}
                   className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-green-700 transition"
                 >
-                  💾 Save Family Data
+                  💾 Upload to Server
                 </button>
               </div>
             )}
