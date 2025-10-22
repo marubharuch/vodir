@@ -17,9 +17,10 @@ const FamilySummaryView = ({
   isUserPending,
 }) => {
   if (!profile?.id) return null;
-
+console.log("isUserNonPendingEditor:", isUserNonPendingEditor);
+  console.log("isUserPending:", isUserPending);
   const creator = members.find((m) => m.userId === profile.createdBy)?.name || "N/A";
-console.log("family summary",members)
+console.log("family summary",profile)
   return (
     <div className="p-4 border rounded-lg shadow bg-white">
       
@@ -30,9 +31,7 @@ console.log("family summary",members)
         <p>
           -<strong> {profile.currentCity || "N/A"} (</strong> {profile.nativeCity || "N/A"})
         </p>
-        <p>
-          <strong>બનાવનાર:</strong> {creator}
-        </p>
+       
       </div>
 
       <h3 className="text- font-bold text-indigo-700 mb-1">👥 MEMBERS</h3>

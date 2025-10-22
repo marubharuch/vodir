@@ -11,7 +11,7 @@ import localforage from "localforage";
  */
 export async function loadFamilyProfile(user, updateProfile) {
   if (!user?.uid) return null;
-
+console.log("load family profile")
   // We use a simple base key. safeLocalForage will handle the user-specific suffix.
   const cacheKey = "profileData";
 

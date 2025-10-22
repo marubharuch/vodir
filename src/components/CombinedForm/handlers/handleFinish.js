@@ -1,4 +1,5 @@
 // src/components/CombinedForm/handlers/handleFinish.js
+
 import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection } from "firebase/firestore";
 import { ref, runTransaction, set } from "firebase/database";
 import { datastore, db } from "../../../firebase";
@@ -31,6 +32,9 @@ console.log("handle finish")
     let successMessage = "";
     let familyIdToSave = profile?.id;
 
+    // 💡 NEW: finalFamilyPayload ને અહીં જાહેર કરો જેથી તે Local Update માં ઉપલબ્ધ હોય
+    let finalFamilyPayload = {}; 
+
     // CREATE NEW FAMILY
     if (!profile?.id) {
       let newSrno;
@@ -41,7 +45,7 @@ console.log("handle finish")
       newSrno = result.snapshot?.val()?.nextSrno - 1;
       familyIdToSave = newSrno.toString();
 
-      const finalFamilyPayload = {
+      finalFamilyPayload = {
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         members,
@@ -77,20 +81,42 @@ console.log("handle finish")
         (msg) => (successMessage = msg),
         setLoading
       );
+      // 💡 NEW: handleUpdateFamily નું અપડેટ થયેલું Payload અહીં સ્ટોર કરો (જો તે પાછું આવતું હોય)
+      // જો handleUpdateFamily આખું payload પાછું ન આપે, તો local update માટે ...profile પર આધાર રાખો.
+      // આ સરળતા માટે, અમે ...profile પર આધાર રાખીશું, પરંતુ તેને સુરક્ષિત રીતે મર્જ કરીશું.
     }
 
     // LOCAL CACHE UPDATE
     const localTime = Date.now();
+    
+    // 🛑 CRITICAL FIX: ...profile ને સુરક્ષિત રીતે મર્જ કરો. 
+    // જો profile null હોય, તો ખાલી ઓબ્જેક્ટ ({}) નો ઉપયોગ કરો.
     const savedData = {
-      ...profile,
+      ...(profile || {}), // ⬅️ જો profile null હોય, તો પણ ખાલી ઓબ્જેક્ટ મર્જ થશે, જેથી Error ન આવે.
+      
+      // CREATE Mode માંના createdBy અને editorEmails ને મર્જ કરો
+      ...finalFamilyPayload, // ⬅️ આનાથી createdBy, editorEmails (Create Mode માં) અને અન્ય ફીલ્ડ્સ આવશે.
+
+      // ફોર્મ ડેટાને હંમેશા ઓવરરાઇડ કરો
       id: familyIdToSave,
       members,
       nativeCity: formData.nativeCity,
       currentCity: formData.currentCity,
+      
+      // ટાઇમસ્ટેમ્પ્સને ક્લાયન્ટ ટાઇમ વડે ઓવરરાઇડ કરો
       updatedAt: localTime,
       lastUpdateTimestamp: localTime,
+      
+      // 💡 CRITICAL FIX: serverTimestamp() ને બદલે વાસ્તવિક સમય સેવ કરો
+      // (Create Mode માં)
+      createdAt: (profile?.createdAt || localTime), 
     };
+    
+    // Debugging (તમે આને પેસ્ટ ન કરી શકો, પરંતુ આનાથી ખબર પડશે કે createdBy સેવ થયું છે)
+    console.log("Final savedData object:", savedData); 
+
     await updateProfile(savedData);
+    
 
     await localforage.setItem(`profileData_${user.uid}`, savedData);
     alert(successMessage);

@@ -44,6 +44,7 @@ const CombinedForm = () => {
     handleEditorApproval,
     toggleMemberPendingStatus,
     handleFinish,
+    hasChanges,
     handleUpdate,
     handleAdd,
     startEditMember,
@@ -53,7 +54,7 @@ const CombinedForm = () => {
     finishAddingMembers,
     showMemberFormModal,
     handleCancelMemberForm,
-    hasChanges,
+    
   } = useCombinedFormLogic();
 
   const isCityDataEntered =
@@ -137,6 +138,8 @@ const CombinedForm = () => {
           )}
 
         {/* ✅ Join / Create / Edit Form */}
+          {console.log("conditions",isEditing,isCityDataEntered,isEditingCity,isFinalView,showMemberFormModal)  }
+           
         {user && !isViewMode && selectedMode !== null && (
           <div className="space-y-6">
 
@@ -165,7 +168,7 @@ const CombinedForm = () => {
             />
 
             {/* 3. Add New Member Button */}
-            {isEditing &&
+           {isEditing &&
               isCityDataEntered &&
               !isEditingCity &&
              // !isFinalView &&
@@ -199,6 +202,7 @@ const CombinedForm = () => {
               isCityDataEntered &&
               !isEditingCity &&
              // !isFinalView &&
+             hasChanges &&
               !showMemberFormModal && (
               <div className="text-center mt-8">
                 <button

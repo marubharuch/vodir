@@ -85,38 +85,40 @@ export function useCombinedFormLogic() {
   // -------------------------------------------------------------
 const hasChanges = useMemo(() => {
     // 1. Initial/New Family Check
-    console.log("Original Members:", originalMembers);
-    console.log("Current Members:", members);
-    console.log("Members Changed:", membersChanged);
-    console.log("City Changed:", cityChanged);
-    console.log("Has Changes:", membersChanged || cityChanged);
     if (!originalMembers || !originalCityData || !profile?.id) {
+        // Console Log: In case of new family/initial load
+        console.log("Has Changes: TRUE (New Family or Initial Load)");
         return true; 
     }
 
-    // --- City Data Comparison (Assuming originalCityData holds { nativeCity, currentCity }) ---
+    // --- 2. City Data Comparison (Declaration of cityChanged) ---
     const cityChanged = (
         formData.nativeCity !== originalCityData.nativeCity ||
         formData.currentCity !== originalCityData.currentCity
     );
 
-    // --- Members Array Comparison (Deep & Sorted) ---
+    // --- 3. Members Array Comparison (Declaration of membersChanged) ---
     const currentMembers = JSON.parse(JSON.stringify(members));
     
-    // यह लाइन 104 पर थी, अब इसे सुरक्षित (safe) बना दिया गया है।
+    // Ensure IDs are converted to string for safe localeCompare (Fixes previous TypeError)
     currentMembers.sort((a, b) => 
         (a.id?.toString() || '').localeCompare(b.id?.toString() || '') 
     ); 
 
-    // Note: originalMembers should also be sorted exactly the same way when it is set initially
-    // to ensure a valid comparison. If originalMembers is already sorted, you don't need to sort it again.
-    // However, to be safe, if originalMembers is not guaranteed to be sorted, you might need to sort it too 
-    // before comparison, or ensure it was sorted exactly the same way before being set as state.
-
     const membersChanged = JSON.stringify(originalMembers) !== JSON.stringify(currentMembers);
 
-    // --- Final Result ---
-    return membersChanged || cityChanged;
+    // --- 4. Console Logs (After all declarations) ---
+    const finalHasChanges = membersChanged || cityChanged;
+    
+    console.log("Original Members:", originalMembers);
+    console.log("Current Members:", members);
+    console.log("City Data Changed:", cityChanged);
+    console.log("Members Data Changed:", membersChanged);
+    console.log("Final Has Changes:", finalHasChanges);
+
+
+    // --- 5. Final Result ---
+    return finalHasChanges;
     
 }, [
     members,
@@ -227,21 +229,35 @@ const hasChanges = useMemo(() => {
   };
   
   // 5. MODIFIED: handleCancelEdit to reset change tracking (Used by the FINAL "Cancel" button)
-  const handleCancelEdit = () => {
-    // Revert view states
+ const handleCancelEdit = () => {
+    // 1. Members array को revert करने के लिए DEEP CLONE का उपयोग करें
+    if (originalMembers) {
+        // JSON.parse(JSON.stringify()) एक ताज़ा, नई कॉपी सुनिश्चित करता है।
+        setMembers(JSON.parse(JSON.stringify(originalMembers))); 
+    }
+    
+    // 2. City data को revert करें
+    if (originalCityData) {
+        setFormData((prev) => ({ 
+            ...prev, 
+            nativeCity: originalCityData.nativeCity,
+            currentCity: originalCityData.currentCity,
+        }));
+    }
+    
+    // 3. View states को रीसेट करें (जैसे था वैसे ही रखें)
     setIsEditing(false);
     setSelectedMemberId(null);
     setFormData((prev) => ({ ...prev, gender: "", name: "", mobile: "" }));
     
-    // 💡 IMPORTANT: Reset the original states to force a clean re-capture next time
-    setOriginalMembers(null);
-    setOriginalCityData(null);
+    // ❌ DO NOT NULLIFY ORIGINAL STATES! (जैसा कि हमने पहले तय किया था)
+    // setOriginalMembers(null); // <-- यह लाइन हटाई गई है
+    // setOriginalCityData(null); // <-- यह लाइन हटाई गई है
     
-    // If in create mode and canceled, go back to the choice screen
     if (selectedMode === "create") {
       setSelectedMode(null);
     }
-  };
+};
   
   const deleteMember = (id) => setMembers((prev) => prev.filter((m) => m.id !== id));
 
@@ -284,8 +300,10 @@ const hasChanges = useMemo(() => {
   // -------------------------------------------------------------
 
   useEffect(() => {}, [user]);
+// ... अन्य स्टेट्स और फ़ंक्शंस ...
 
-  return {
+
+ return {
     user,
     profile,
     members,
@@ -332,6 +350,7 @@ const hasChanges = useMemo(() => {
     handleEditorApproval: (email, approve) => handleEditorApproval(email, approve, profile, user, updateProfile, setWarning, setLoading),
     toggleMemberPendingStatus: (memberId, pending) => toggleMemberPendingStatus(memberId, pending, profile, updateProfile, setWarning, setLoading, setMembers),
     handleFinish: handleFamilySaveAndReset,
+    hasChanges,
     handleCancelEdit, // FINAL 'Cancel' button handler (resets everything)
     handleCloseForm,  // Old handler (not used now)
     handleCancelMemberForm, 
@@ -341,5 +360,6 @@ const hasChanges = useMemo(() => {
     startEditMember,
     handleUpdate, 
     deleteMember,
+    
   };
 }
