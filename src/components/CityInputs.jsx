@@ -19,7 +19,7 @@ const CityInputs = ({
         return (
             <div className="mb-4 p-4 border rounded-lg shadow-sm bg-white">
                 <div className="flex justify-between items-center border-b pb-2 mb-2">
-                    <h2 className="text-xl font-bold text-indigo-700">📍 ફેમિલી સ્થાન</h2>
+                    <h2 className="text-xl font-bold text-indigo-700">📍Native & Current Place </h2>
                     {/* Only show Edit button if master editing is ON */}
                     {isEditing && (
                          <button 

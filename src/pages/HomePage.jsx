@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../context/ProfileContext";
 import TeamDirectory from "./TeamDirectory";
 import CityRibbon from "../components/CityRibbon";
+import { Link } from "react-router-dom";
 // Removed unused imports: CombinedForm, Carousel, CardList, images, cards
 
 // We can define a simple icon for the Logout button
@@ -105,10 +106,24 @@ console.log("home page v-1")
                     <br/>
                     કૃપા કરીને તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
                 </p>
-                <p className="text-sm font-bold text-indigo-800 mt-3">
+              { /* <p className="text-sm font-bold text-indigo-800 mt-3">
                     આપના પરિવારનો ડેટા અપડેટ કરવા માટે જમણી બાજુના નીચેના ખૂણામાં **'Family'** બટન પર ક્લિક કરો.
                 </p>
+*/}               
+
             </div>
+            <>
+             <p className="text-m font-bold text-indigo-800 mt-3">
+  
+  <Link
+    to="/voice"
+    className="text-blue-600 underline hover:text-blue-800 transition"
+  >
+    'Click here to Add/Update your family '
+  </Link>{" "}
+  
+</p>
+            </>
 
         </div>
 

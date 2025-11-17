@@ -52,29 +52,34 @@ const Navbar = () => {
 
         {/* Profile/Login Icon on Right */}
         <div>
-          <Link to="/login" className="hover:text-gray-300" onClick={handleCloseMenu}>
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M5.121 17.804A9 9 0 1118.88 6.195 9 9 0 015.12 17.804z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-          </Link>
-        </div>
+  <button
+    onClick={() => {
+      handleCloseMenu(); // your existing function
+      if (window.matchMedia('(display-mode: standalone)').matches) {
+        window.close(); // for PWA
+      } else {
+        window.location.href = "about:blank"; // for normal browser
+      }
+    }}
+    className="hover:text-red-500 transition"
+  >
+    <svg
+      className="w-6 h-6"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        d="M6 18L18 6M6 6l12 12"
+      />
+    </svg>
+  </button>
+</div>
+
       </div>
 
       {/* Mobile Menu */}

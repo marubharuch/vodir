@@ -58,7 +58,7 @@ const LoginPage = () => {
       const storedProfile = await localforage.getItem(profileKey);
       console.log(`LocalForage Profile Data (${profileKey}):`, storedProfile);
 
-      alert(`Welcome ${userData.displayName || userData.email}! 🎉 Login successful`);
+      //alert(`Welcome ${userData.displayName || userData.email}! 🎉 Login successful`);
       navigate("/"); // Navigate to the home page on success
     } catch (err) {
       console.warn("Popup blocked, trying redirect…", err);
@@ -102,7 +102,7 @@ const LoginPage = () => {
       await localforage.setItem("authUser", userData);
       await login(userData);
 
-      alert(`Welcome ${userData.displayName || userData.email}! 🎉`);
+     // alert(`Welcome ${userData.displayName || userData.email}! 🎉`);
       navigate("/"); // Navigate to the home page
     } catch (err) {
       alert(err.message);
