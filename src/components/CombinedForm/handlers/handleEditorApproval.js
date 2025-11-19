@@ -1,17 +1,8 @@
-// ✅ FIXED: src/components/CombinedForm/handlers/handleEditorApproval.js
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { datastore } from "../../../firebase";
+// 🔥 RTDB + Safe Email Version (FINAL FIXED)
+import { ref, get, update } from "firebase/database";
+import { db } from "../../../firebase";
+import localforage from "localforage";
 
-/**
- * Handles approving or rejecting editor requests
- * @param {string} email - Email of the pending editor
- * @param {boolean} approve - true=approve, false=reject
- * @param {object} profile - Current family profile
- * @param {function} updateProfile - Function to update local profile
- * @param {function} setWarning - Function to set warning message
- * @param {function} setLoading - Function to toggle loading spinner
- * @param {object} user - Currently logged-in Firebase user
- */
 export async function handleEditorApproval(
   email,
   approve,
@@ -21,60 +12,89 @@ export async function handleEditorApproval(
   setLoading,
   user
 ) {
-  // ✅ Check: only current editors can approve/reject
-  const isCurrentUserEditor = profile?.editorEmails?.includes(user?.email);
+  const rawUserEmail = user?.email;
+  const safeUserEmail = rawUserEmail?.replace(/\./g, "_");
 
-  if (!isCurrentUserEditor) {
+  // Check permission
+  const isEditor =
+  Array.isArray(profile?.editorEmails) &&
+  profile.editorEmails.includes(user.email);
+
+  if (!isEditor) {
     setWarning("⚠️ તમને રિક્વેસ્ટ મંજૂર કે રદ કરવાની પરવાનગી નથી.");
     return;
   }
 
-  if (
-    !window.confirm(
-      `${approve ? "✅ Approve" : "❌ Reject"} request from ${email}?`
-    )
-  )
-    return;
+  if (!window.confirm(`${approve ? "Approve" : "Reject"} ${email}?`)) return;
 
   setLoading(true);
+
   try {
-    const familiesRef = doc(datastore, "families", profile.id);
+    const safeEmail = email.replace(/\./g, "_");
 
-    // Clone current arrays safely
-    let updatedEditors = [...(profile.editorEmails || [])];
-    let updatedPending = [...(profile.pendingEditorEmails || [])];
+    const familyRef = ref(db, `families/${profile.id}`);
+    const snap = await get(familyRef);
 
-    if (approve) {
-      // Add to editor list only if not already added
-      if (!updatedEditors.includes(email)) {
-        updatedEditors.push(email);
-      }
-      updatedPending = updatedPending.filter((e) => e !== email);
-      setWarning(`✅ ${email} approved.`);
-    } else {
-      // Reject: remove from pending
-      updatedPending = updatedPending.filter((e) => e !== email);
-      setWarning(`❌ ${email} rejected.`);
-
-      // Optional: unlink user in Firestore "users" collection
-      const userRef = doc(datastore, "users", email);
-      await updateDoc(userRef, { familySrno: null }).catch(() => {});
+    if (!snap.exists()) {
+      setWarning("⚠️ Family not found.");
+      return;
     }
 
-    // Update Firestore family document
-    await updateDoc(familiesRef, {
-      editorEmails: updatedEditors,
-      pendingEditorEmails: updatedPending,
-      updatedAt: serverTimestamp(),
-    });
+    const data = snap.val();
+    const editors = data.editorEmails || {};
+    const pending = data.pendingEditorEmails || {};
 
-    // Update local profile in memory
-    await updateProfile({
-      ...profile,
-      editorEmails: updatedEditors,
-      pendingEditorEmails: updatedPending,
+    // APPROVE
+    if (approve) {
+      editors[safeEmail] = true;
+      delete pending[safeEmail];
+      setWarning(`✅ ${email} approved.`);
+    }
+
+    // REJECT
+    else {
+      delete pending[safeEmail];
+      setWarning(`❌ ${email} rejected.`);
+
+      // ❗ FIXED: Remove familySrno using UID, not email
+      const targetUid = data?.memberUserIds?.[safeEmail]; // optional mapping
+      if (targetUid) {
+        await update(ref(db, `users/${targetUid}`), {
+          familySrno: null,
+        });
+      }
+    }
+
+    // Save back to RTDB
+    await update(familyRef, {
+      editorEmails: editors,
+      pendingEditorEmails: pending,
       updatedAt: Date.now(),
     });
+
+    // Normalize for UI
+    const normalizedEditors = Object.keys(editors).map((k) =>
+      k.replace(/_/g, ".")
+    );
+    const normalizedPending = Object.keys(pending).map((k) =>
+      k.replace(/_/g, ".")
+    );
+
+    const updatedProfile = {
+      ...profile,
+      editorEmails: normalizedEditors,
+      pendingEditorEmails: normalizedPending,
+      updatedAt: Date.now(),
+    };
+
+    // Save in LocalForage
+    await localforage.setItem(
+      `profileData_${user.uid}`,
+      updatedProfile
+    );
+
+    // Update UI
+    updateProfile(updatedProfile);
   } catch (err) {
     console.error("Approval error:", err);
     setWarning("⚠️ Failed to update approval.");

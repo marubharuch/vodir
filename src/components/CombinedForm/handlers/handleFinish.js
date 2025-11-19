@@ -1,8 +1,6 @@
-// src/components/CombinedForm/handlers/handleFinish.js
-
-import { doc, setDoc, updateDoc, getDoc, serverTimestamp, collection } from "firebase/firestore";
-import { ref, runTransaction, set } from "firebase/database";
-import { datastore, db } from "../../../firebase";
+// 🔥 RTDB + Safe Email Version
+import { ref, runTransaction, set, update, get } from "firebase/database";
+import { db } from "../../../firebase";
 import localforage from "localforage";
 import { handleUpdateFamily } from "../utils/familyHelpers";
 
@@ -20,28 +18,33 @@ export async function handleFinish(
     setWarning("❌ યુઝરનો ઇમેલ મળતો નથી. ફરીથી લોગિન કરો.");
     return;
   }
-console.log("handle finish")
+
   setLoading(true);
   setWarning("");
+  console.log("handle finish (RTDB)");
 
   try {
-    const familiesRef = collection(datastore, "families");
-    const userIndexRef = ref(db, `users/${user.uid}/familySrno`);
-    const masterIndexRef = ref(db, "master/familyIndex");
     const currentUserEmail = user.email;
+    const safeEmail = currentUserEmail.replace(/\./g, "_");
+
     let successMessage = "";
     let familyIdToSave = profile?.id;
 
-    // 💡 NEW: finalFamilyPayload ને અહીં જાહેર કરો જેથી તે Local Update માં ઉપલબ્ધ હોય
-    let finalFamilyPayload = {}; 
+    const userIndexRef = ref(db, `users/${safeEmail}/familySrno`);
+    const masterIndexRef = ref(db, "master/familyIndex");
 
-    // CREATE NEW FAMILY
+    let finalFamilyPayload = {};
+
+    // --------------------------------------------------------
+    // CREATE MODE
+    // --------------------------------------------------------
     if (!profile?.id) {
       let newSrno;
       const result = await runTransaction(masterIndexRef, (data) => {
         let next = data?.nextSrno || 1;
         return { nextSrno: next + 1 };
       });
+
       newSrno = result.snapshot?.val()?.nextSrno - 1;
       familyIdToSave = newSrno.toString();
 
@@ -49,77 +52,70 @@ console.log("handle finish")
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         members,
-        createdBy: user.uid,
-        createdAt: serverTimestamp(),
-        editorEmails: [currentUserEmail],
-        pendingEditorEmails: [],
+        createdBy: safeEmail,
+        createdAt: Date.now(),
+        editorEmails: { [safeEmail]: true },
+        pendingEditorEmails: {},
+        updatedAt: Date.now(),
+        lastUpdateTimestamp: Date.now(),
       };
 
-      await setDoc(doc(familiesRef, familyIdToSave), finalFamilyPayload);
+      // save full family
+      await set(ref(db, `families/${familyIdToSave}`), finalFamilyPayload);
+
+      // link user
       await set(userIndexRef, familyIdToSave);
 
-      successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
-
-      const summaryRef = ref(db, `familyDetails/${familyIdToSave}`);
-      await set(summaryRef, {
+      // summary table
+      await set(ref(db, `familyDetails/${familyIdToSave}`), {
         lastUpdateTimestamp: Date.now(),
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         totalMembers: members.length,
       });
+
+      successMessage = `✅ New Family created! ID (SRNO): ${familyIdToSave}`;
     }
-    // UPDATE EXISTING FAMILY
+
+    // --------------------------------------------------------
+    // UPDATE MODE
+    // --------------------------------------------------------
     else {
-      const result = await handleUpdateFamily(
+      await handleUpdateFamily(
         familyIdToSave,
         members,
-        currentUserEmail,
+        safeEmail,
         profile,
         formData,
         userIndexRef,
-        familiesRef,
+        null,
         (msg) => (successMessage = msg),
         setLoading
       );
-      // 💡 NEW: handleUpdateFamily નું અપડેટ થયેલું Payload અહીં સ્ટોર કરો (જો તે પાછું આવતું હોય)
-      // જો handleUpdateFamily આખું payload પાછું ન આપે, તો local update માટે ...profile પર આધાર રાખો.
-      // આ સરળતા માટે, અમે ...profile પર આધાર રાખીશું, પરંતુ તેને સુરક્ષિત રીતે મર્જ કરીશું.
     }
 
-    // LOCAL CACHE UPDATE
+    // --------------------------------------------------------
+    // UPDATE LOCAL CACHE
+    // --------------------------------------------------------
     const localTime = Date.now();
-    
-    // 🛑 CRITICAL FIX: ...profile ને સુરક્ષિત રીતે મર્જ કરો. 
-    // જો profile null હોય, તો ખાલી ઓબ્જેક્ટ ({}) નો ઉપયોગ કરો.
-    const savedData = {
-      ...(profile || {}), // ⬅️ જો profile null હોય, તો પણ ખાલી ઓબ્જેક્ટ મર્જ થશે, જેથી Error ન આવે.
-      
-      // CREATE Mode માંના createdBy અને editorEmails ને મર્જ કરો
-      ...finalFamilyPayload, // ⬅️ આનાથી createdBy, editorEmails (Create Mode માં) અને અન્ય ફીલ્ડ્સ આવશે.
 
-      // ફોર્મ ડેટાને હંમેશા ઓવરરાઇડ કરો
+    const savedData = {
+      ...(profile || {}),
+      ...finalFamilyPayload,
       id: familyIdToSave,
       members,
       nativeCity: formData.nativeCity,
       currentCity: formData.currentCity,
-      
-      // ટાઇમસ્ટેમ્પ્સને ક્લાયન્ટ ટાઇમ વડે ઓવરરાઇડ કરો
       updatedAt: localTime,
       lastUpdateTimestamp: localTime,
-      
-      // 💡 CRITICAL FIX: serverTimestamp() ને બદલે વાસ્તવિક સમય સેવ કરો
-      // (Create Mode માં)
-      createdAt: (profile?.createdAt || localTime), 
+      createdAt: profile?.createdAt || localTime,
     };
-    
-    // Debugging (તમે આને પેસ્ટ ન કરી શકો, પરંતુ આનાથી ખબર પડશે કે createdBy સેવ થયું છે)
-    console.log("Final savedData object:", savedData); 
 
     await updateProfile(savedData);
-    
+    await localforage.setItem(`profileData_${safeEmail}`, savedData);
 
-    await localforage.setItem(`profileData_${user.uid}`, savedData);
     alert(successMessage);
+
   } catch (err) {
     console.error("Save Error:", err);
     setWarning("⚠️ Family save failed.");

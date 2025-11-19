@@ -1,40 +1,74 @@
-// src/components/CombinedForm/handlers/handleJoinFamily.js
-import { doc, getDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { ref, set } from "firebase/database";
-import { datastore, db } from "../../../firebase";
+// 🔥 RTDB + Safe Email Version (Fully Corrected)
+import { ref, get, update } from "firebase/database";
+import { db } from "../../../firebase";
 
-// 💡 FIX: Add 'setShowJoinPopup' to the list of function parameters.
-export async function handleJoinFamily(srno, mobile, user, setShowJoinPopup, setWarning, setLoading) {
+export async function handleJoinFamily(
+  srno,
+  mobile,
+  user,
+  setShowJoinPopup,
+  setWarning,
+  setLoading
+) {
   setLoading(true);
   setWarning("");
-const userEmail = user.email; // Use 'const' or 'let' to define it
+
   try {
-    const familyRef = doc(datastore, "families", srno.toString());
-    const familySnap = await getDoc(familyRef);
+    const rawEmail = user.email;
+    const safeEmail = rawEmail.replace(/\./g, "_");
+
+    const familyRef = ref(db, `families/${srno}`);
+    const familySnap = await get(familyRef);
+
     if (!familySnap.exists()) {
       setWarning(`❌ SRNO ${srno} માટે કોઈ ફેમિલી મળી નથી.`);
-      return; // 🛑 STOP HERE: Don't close popup or continue on error
+      return;
     }
 
-    const familyData = familySnap.data();
-    if (familyData.pendingEditorEmails?.includes(userEmail)) {
-        setWarning("⚠️ તમારી એડિટર રિક્વેસ્ટ પહેલેથી જ મોકલેલી છે અને પેન્ડિંગ છે.");
-        return; // Exit if a pending request already exists
+    const familyData = familySnap.val();
+
+    // Check existing pending request
+    const pendingMap = familyData.pendingEditorEmails || {};
+    if (pendingMap[safeEmail]) {
+      setWarning("⚠️ તમારી એડિટર રિક્વેસ્ટ પહેલેથી જ પેન્ડિંગ છે.");
+      return;
     }
-    const matchedMember = familyData.members?.find((m) => m.mobile === mobile);
-    if (!matchedMember) {
+
+    // Convert members object -> array (FIXED)
+    const membersObj = familyData.members || {};
+    const memberArray = Object.keys(membersObj).map((id) => ({
+      id,
+      ...membersObj[id],
+    }));
+
+    // Match mobile inside members (FIXED)
+    const matched = memberArray.find(
+      (m) => m.mobile?.toString() === mobile.toString()
+    );
+
+    if (!matched) {
       setWarning("❌ દાખલ કરેલો મોબાઈલ નંબર આ ફેમિલીમાં મળ્યો નથી.");
-      return; // 🛑 STOP HERE: Don't close popup or continue on error
+      return;
     }
 
-    const updatedPending = [...(familyData.pendingEditorEmails || []), user.email];
-    await updateDoc(familyRef, { pendingEditorEmails: updatedPending, updatedAt: serverTimestamp() });
-    await set(ref(db, `users/${user.uid}/familySrno`), srno.toString());
+    // Add pending editor request
+    const updatedPending = {
+      ...pendingMap,
+      [safeEmail]: true,
+    };
 
-    setWarning("✅ તમારી એડિટર રિક્વેસ્ટ મોકલાઈ ગઈ છે!");
-    
-    // ✅ SUCCESS: Close the popup ONLY on success
-    setShowJoinPopup(false); 
+    await update(familyRef, {
+      pendingEditorEmails: updatedPending,
+      updatedAt: Date.now(),
+    });
+
+    // FIXED: Link UID, not email
+    await update(ref(db, `users/${user.uid}`), {
+      familySrno: srno.toString(),
+    });
+
+    setWarning("✅ તમારી રિક્વેસ્ટ મોકલાઈ ગઈ!");
+    setShowJoinPopup(false);
 
   } catch (err) {
     console.error("Join Family Error:", err);

@@ -62,27 +62,39 @@ const CombinedForm = () => {
     (formData.currentCity || "").trim().length > 0;
 
   const currentHandleSave = selectedMemberId ? handleUpdate : handleAdd;
+
+  // User fully approved as editor
   const isUserNonPendingEditor = isApprovedEditor && !isUserPending;
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-md p-4 sm:p-6 space-y-6">
         
-        {/* ✅ VIEW MODE */}
+        {/* =================================================================== */}
+        {/*  1️⃣ VIEW MODE (User has a family & not editing)                    */}
+        {/* =================================================================== */}
         {user && isViewMode && (
           <FamilySummaryView
             profile={profile}
             user={user}
             members={members}
+            loading={loading}
             enterEditMode={enterEditMode}
             isUserNonPendingEditor={isUserNonPendingEditor}
+            isUserPending={isUserPending}
+            handleEditorApproval={handleEditorApproval}
+            updateProfile={updateProfile}
           />
         )}
 
-        {/* ✅ INITIAL CHOICE SCREEN (Hides when pending or joined) */}
+        {/* =================================================================== */}
+        {/*  2️⃣ FIRST SCREEN: Join or Create (Only if no family yet)           */}
+        {/* =================================================================== */}
         {user && !profile?.id && selectedMode === null && !loading && !isUserPending && (
           <div className="text-center space-y-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">શું કરવા માંગો છો?</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              શું કરવા માંગો છો?
+            </h2>
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => setShowJoinPopup(true)}
@@ -105,7 +117,9 @@ const CombinedForm = () => {
           </div>
         )}
 
-        {/* 🕓 Show message when user is pending approval */}
+        {/* =================================================================== */}
+        {/*  3️⃣ USER IS PENDING APPROVAL                                        */}
+        {/* =================================================================== */}
         {user && isUserPending && (
           <div className="text-center p-6 bg-yellow-50 border border-yellow-300 rounded-xl">
             <h2 className="text-lg font-semibold text-yellow-700">
@@ -117,68 +131,13 @@ const CombinedForm = () => {
           </div>
         )}
 
-        {/* ✅ PENDING EDITOR APPROVAL SECTION */}
-        {profile?.id &&
-          isApprovedEditor &&
-          Array.isArray(profile.pendingEditorEmails) &&
-          profile.pendingEditorEmails.length > 0 && (
-            <div className="p-4 border border-blue-300 bg-blue-50 rounded-xl">
-              <h3 className="text-lg font-semibold text-blue-700 mb-2">🖊️ Pending Editor Requests</h3>
-
-              <ul className="space-y-2">
-                {profile.pendingEditorEmails.map((email) => (
-                  <li
-                    key={email}
-                    className="flex justify-between items-center bg-white border rounded-md p-2"
-                  >
-                    {/* ❌ Reject Button (add user as param) */}
-                    <button
-                      onClick={() =>
-                        handleEditorApproval(
-                          email,
-                          false,
-                          profile,
-                          updateProfile,
-                          setWarning,
-                          setLoading,
-                          user
-                        )
-                      }
-                      className="bg-red-600 text-white text-sm px-3 py-1 rounded hover:bg-red-700"
-                    >
-                      Reject
-                    </button>
-
-                    <span className="text-gray-700 text-sm sm:text-base flex-1 text-center">
-                      {email}
-                    </span>
-
-                    {/* ✅ Approve Button (add user as param) */}
-                    <button
-                      onClick={() =>
-                        handleEditorApproval(
-                          email,
-                          true,
-                          profile,
-                          updateProfile,
-                          setWarning,
-                          setLoading,
-                          user
-                        )
-                      }
-                      className="bg-green-600 text-white text-sm px-3 py-1 rounded hover:bg-green-700"
-                    >
-                      Approve
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-        {/* ✅ JOIN / CREATE / EDIT FORM */}
+        {/* =================================================================== */}
+        {/*  4️⃣ FAMILY FORM: Create / Edit Mode                                 */}
+        {/* =================================================================== */}
         {user && !isViewMode && selectedMode !== null && (
           <div className="space-y-6">
+
+            {/* CITY INPUTS */}
             {!shouldSkipCityInputs && (
               <CityInputs
                 formData={formData}
@@ -191,6 +150,7 @@ const CombinedForm = () => {
               />
             )}
 
+            {/* MEMBERS LIST */}
             <MemberList
               members={members}
               loading={loading}
@@ -201,20 +161,19 @@ const CombinedForm = () => {
               toggleMemberPendingStatus={toggleMemberPendingStatus}
             />
 
-            {isEditing &&
-              isCityDataEntered &&
-              !isEditingCity &&
-              !showMemberFormModal && (
-                <div className="mt-5 text-center">
-                  <button
-                    onClick={startAddingNewMember}
-                    className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
-                  >
-                    ➕ Add New Member
-                  </button>
-                </div>
-              )}
+            {/* Add Member */}
+            {isEditing && isCityDataEntered && !isEditingCity && !showMemberFormModal && (
+              <div className="mt-5 text-center">
+                <button
+                  onClick={startAddingNewMember}
+                  className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-semibold shadow hover:bg-green-700 transition"
+                >
+                  ➕ Add New Member
+                </button>
+              </div>
+            )}
 
+            {/* Finish Adding Members (Create Mode Only) */}
             {selectedMode === "create" &&
               members.length > 0 &&
               !isFinalView &&
@@ -228,6 +187,7 @@ const CombinedForm = () => {
                 </button>
               )}
 
+            {/* SAVE BUTTON */}
             {isEditing &&
               isCityDataEntered &&
               !isEditingCity &&
@@ -246,7 +206,9 @@ const CombinedForm = () => {
           </div>
         )}
 
-        {/* ✅ Member Form Modal */}
+        {/* =================================================================== */}
+        {/*  5️⃣ MEMBER FORM MODAL                                               */}
+        {/* =================================================================== */}
         {showMemberFormModal && (
           <MemberForm
             handleCancelEdit={handleCancelMemberForm}
@@ -258,30 +220,29 @@ const CombinedForm = () => {
           />
         )}
 
-        {/* ✅ Warning Message */}
+        {/* =================================================================== */}
+        {/*  6️⃣ WARNING MESSAGE                                                 */}
+        {/* =================================================================== */}
         {warning && (
           <p className="text-center text-red-500 font-medium">{warning}</p>
         )}
 
-        {/* ✅ LocalForage Modal */}
+        {/* =================================================================== */}
+        {/*  7️⃣ LOCALFORAGE MODAL                                               */}
+        {/* =================================================================== */}
         <LocalForageDataModal
           show={showDataModal}
           content={localForageDataModalContent}
         />
 
-        {/* ✅ Join Family Popup */}
+        {/* =================================================================== */}
+        {/*  8️⃣ JOIN FAMILY POPUP                                               */}
+        {/* =================================================================== */}
         {showJoinPopup && (
           <JoinFamilyPopup
             onClose={() => setShowJoinPopup(false)}
             onSubmit={(srno, mobile) =>
-              handleJoinFamily(
-                srno,
-                mobile,
-                user,
-                setShowJoinPopup,
-                setWarning,
-                setLoading
-              )
+              handleJoinFamily(srno, mobile, user, setShowJoinPopup, setWarning, setLoading)
             }
             warning={warning}
             setWarning={setWarning}

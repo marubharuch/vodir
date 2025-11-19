@@ -1,6 +1,8 @@
+// 🔥 RTDB-ONLY VERSION
 // src/components/CombinedForm/handlers/enterEditMode.js
-import { doc, getDoc } from "firebase/firestore";
-import { datastore } from "../../../firebase";
+
+import { ref, get } from "firebase/database";
+import { db } from "../../../firebase";
 
 export async function enterEditMode(
   profile,
@@ -24,22 +26,28 @@ export async function enterEditMode(
       return;
     }
 
-    // ✅ Fetch full profile data from Firestore
-    const familyRef = doc(datastore, "families", profile.id);
-    const snapshot = await getDoc(familyRef);
+    // ------------------------------------------------------
+    // 🔍 Fetch family data from Realtime Database
+    // ------------------------------------------------------
+    const familyRef = ref(db, `families/${profile.id}`);
+    const snapshot = await get(familyRef);
 
     if (!snapshot.exists()) {
-      setWarning("⚠️ Family data not found in database.");
+      setWarning("⚠️ Family data not found.");
       setLoading(false);
       return;
     }
 
-    const data = snapshot.data();
+    const data = snapshot.val();
 
-    // ✅ Update profile state in parent
+    // ------------------------------------------------------
+    // 🔄 Update profile (merge with existing)
+    // ------------------------------------------------------
     updateProfile({ ...profile, ...data });
 
-    // ✅ Update CityInput form fields
+    // ------------------------------------------------------
+    // 🏙 Update form fields (CityInput)
+    // ------------------------------------------------------
     setFormData({
       currentCity: data.currentCity || "",
       nativeCity: data.nativeCity || "",
@@ -50,20 +58,26 @@ export async function enterEditMode(
       pinCode: data.pinCode || "",
     });
 
-    // ✅ Update members (for MemberForm)
+    // ------------------------------------------------------
+    // 👥 Update Member List
+    // ------------------------------------------------------
     const fetchedMembers = Array.isArray(data.members) ? data.members : [];
     setMembers(fetchedMembers);
 
-    // ✅ Trigger edit mode (this ensures both forms show)
+    // ------------------------------------------------------
+    // ✏️ Activate Edit Mode
+    // ------------------------------------------------------
     setSelectedMode("edit");
     setIsEditing(true);
-setIsFinalView(true); 
-    console.log("✅ Edit mode activated with family data:", {
+    setIsFinalView(true);
+
+    console.log("✅ Edit mode activated (RTDB):", {
       formData: data,
       members: fetchedMembers,
     });
+
   } catch (error) {
-    console.error("❌ Error entering edit mode:", error);
+    console.error("❌ RTDB Error entering edit mode:", error);
     setWarning("Database read failed. Please try again.");
   } finally {
     setLoading(false);

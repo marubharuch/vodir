@@ -1,58 +1,75 @@
+// 🔥 RTDB-ONLY VERSION
 // src/components/CombinedForm/utils/familyHelpers.js
-import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { datastore } from "../../../firebase";
 
+import { ref, get, update } from "firebase/database";
+import { db } from "../../../firebase";
+
+/**
+ * ---------------------------------------------------------
+ * 🧩 handleUpdateFamily (RTDB version)
+ * Updates: members, cities, editorEmails, pendings, etc.
+ * ---------------------------------------------------------
+ */
 export async function handleUpdateFamily(
   familyIdToSave,
   members,
   currentUserEmail,
   profile,
   formData,
-  userIndexRef, // This is unused, but we'll keep it for function signature integrity
-  familiesRef,
+  userIndexRef,     // kept for signature compatibility
+  familiesRef,      // Firestore version not needed anymore
   successMessageCallback,
   setLoadingCallback
 ) {
   try {
-    // 1. Construct the minimal update payload only with fields that are changing.
-    // We explicitly include members, nativeCity, and currentCity.
+    const familyRef = ref(db, `families/${familyIdToSave}`);
+    const familySnap = await get(familyRef);
+
+    if (!familySnap.exists()) {
+      throw new Error("Family not found in RTDB");
+    }
+
+    const familyData = familySnap.val();
+
+    // Build RTDB-safe email maps
+    const editorEmails = familyData.editorEmails || {};
+    const pendingEditorEmails = familyData.pendingEditorEmails || {};
+
+    // ---------------------------------------------------------
+    // 🔄 Prepare update payload
+    // ---------------------------------------------------------
     const updateFields = {
       members: members,
       nativeCity: formData.nativeCity,
       currentCity: formData.currentCity,
-      updatedAt: serverTimestamp(),
-      // We explicitly include editorEmails and pendingEditorEmails ONLY IF they
-      // have changed, but in this context, we'll assume they are stable
-      // or managed elsewhere, and just update the main data points.
-      // If we *must* ensure they are in the payload:
-      editorEmails: profile.editorEmails || [],
-      pendingEditorEmails: profile.pendingEditorEmails || [],
+      editorEmails,
+      pendingEditorEmails,
+      updatedAt: Date.now(),
     };
-    
-    // IMPORTANT: DO NOT include 'createdBy' and 'createdAt' in the update payload.
-    // They are static fields and should not be updated. updateDoc will automatically
-    // leave them alone if they are not included in the payload.
 
-    await updateDoc(doc(familiesRef, familyIdToSave), updateFields);
-    
+    // ---------------------------------------------------------
+    // 📝 Commit update
+    // ---------------------------------------------------------
+    await update(familyRef, updateFields);
+
     successMessageCallback(`✅ Family ${familyIdToSave} updated successfully!`);
-    
-    // The members and city updates are now correctly included in the Firestore call.
-    return { 
-        updatedFields: updateFields,
-        // For local profile update, you'd want to merge the new data with the old profile
-        // but here we just return the fields that were updated in the DB
-    }; 
+
+    return {
+      updatedFields: updateFields,
+    };
   } catch (err) {
-    console.error("Update Family Error:", err);
+    console.error("RTDB Update Family Error:", err);
     throw err;
   } finally {
-    // The loading status should be handled by the caller (handleFinish.js)
-    // but since the original code had it here, we'll keep it.
     setLoadingCallback(false);
   }
 }
 
+/**
+ * ---------------------------------------------------------
+ * 🔄 toggleMemberPendingStatus (RTDB version)
+ * ---------------------------------------------------------
+ */
 export async function toggleMemberPendingStatus(
   memberId,
   currentPending,
@@ -62,29 +79,57 @@ export async function toggleMemberPendingStatus(
   setLoading,
   setMembers
 ) {
-  if (!profile?.editorEmails?.length) {
-    setWarning("⚠️ તમે આ સભ્યની સ્થિતિ બદલવાની પરવાનગી નથી.");
-    return;
+  if (!profile?.editorEmails || !profile.editorEmails[profile?.currentUserEmail]) {
+    // If editorEmails is a map, check permissions correctly
+    // If it's array in local profile, fallback to array check
+    const hasPermission =
+      Array.isArray(profile?.editorEmails)
+        ? profile.editorEmails.includes(profile?.currentUserEmail)
+        : !!profile.editorEmails[profile?.currentUserEmail];
+
+    if (!hasPermission) {
+      setWarning("⚠️ તમે આ સભ્યની સ્થિતિ બદલવાની પરવાનગી નથી.");
+      return;
+    }
   }
 
   if (!window.confirm("Change member status?")) return;
   setLoading(true);
 
   try {
-    const updatedMembers = profile.members.map((m) =>
+    const familyRef = ref(db, `families/${profile.id}`);
+    const snapshot = await get(familyRef);
+
+    if (!snapshot.exists()) {
+      setWarning("❌ Family data not found.");
+      return;
+    }
+
+    const familyData = snapshot.val();
+    const updatedMembers = (familyData.members || []).map((m) =>
       m.id === memberId ? { ...m, pending: !currentPending } : m
     );
 
-    await updateDoc(doc(datastore, "families", profile.id), {
+    // ---------------------------------------------------------
+    // 🔄 Update RTDB
+    // ---------------------------------------------------------
+    await update(familyRef, {
       members: updatedMembers,
-      updatedAt: serverTimestamp(),
+      updatedAt: Date.now(),
     });
 
-    await updateProfile({ ...profile, members: updatedMembers });
+    // ---------------------------------------------------------
+    // 🔄 Update local UI
+    // ---------------------------------------------------------
+    await updateProfile({
+      ...profile,
+      members: updatedMembers,
+    });
+
     setMembers(updatedMembers);
     setWarning("✅ Member status updated.");
   } catch (err) {
-    console.error("Status toggle error:", err);
+    console.error("RTDB status toggle error:", err);
     setWarning("⚠️ Update failed.");
   } finally {
     setLoading(false);
