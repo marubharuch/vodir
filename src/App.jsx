@@ -9,7 +9,7 @@ import HousieUser from "./housie/HousieUser";
 import HousieAdmin from "./housie/HousieAdmin";
 import FamilyPage from "./pages/FamilyPage";
 import TeamDirectory from "./pages/TeamDirectory";
-
+import BoardsPage from "./pages/Boards"
 import CombinedForm from "./components/CombinedForm/CombinedForm";
 import ProfilePage from "./pages/ProfilePage";
 import { AuthProvider, useAuth } from "./context/AuthContext"; // ✅ useAuth hook
@@ -80,6 +80,14 @@ function App() {
                 </PrivateRoute>
               }
             />
+            <Route
+  path="/boards"
+  element={
+    <PrivateRoute>
+      <BoardsPage />
+    </PrivateRoute>
+  }
+/>
             <Route
               path="/voice"
               element={

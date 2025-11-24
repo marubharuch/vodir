@@ -56,6 +56,7 @@ const CombinedForm = () => {
     showMemberFormModal,
     handleCancelMemberForm,
   } = useCombinedFormLogic();
+  
 
   const isCityDataEntered =
     (formData.nativeCity || "").trim().length > 0 &&
@@ -195,7 +196,20 @@ const CombinedForm = () => {
               !showMemberFormModal && (
                 <div className="text-center mt-8">
                   <button
-                    onClick={handleFinish}
+                  
+  onClick={() =>
+    handleFinish({
+      profile,
+      user,
+      updateProfile,
+      members,
+      formData,
+      setMembers,
+      setWarning,
+      setLoading
+    })
+  }
+
                     disabled={!canSaveFamily || loading}
                     className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-bold shadow hover:bg-green-700 transition"
                   >
