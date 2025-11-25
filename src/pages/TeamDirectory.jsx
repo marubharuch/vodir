@@ -53,7 +53,7 @@ const MemberName = ({ member }) => {
 const TeamDirectory = () => {
   return (
     // Padded container with a light background for contrast
-    <div className="p-4 sm:p-6 bg-gray-50 rounded-lg">
+    <div className="p-1 sm:p-2 bg-gray-50 rounded-lg">
       <div className="max-w-4xl mx-auto">
         
         {/* Global Title */}

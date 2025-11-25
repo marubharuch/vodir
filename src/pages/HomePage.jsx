@@ -84,54 +84,49 @@ console.log("home page v-1")
 
       {/* --- Main Content Area --- */}
       <main className="p-4 sm:p-6 flex-1">
-        
-        {/* --- Instructions/Update Card --- */}
-        <div className="bg-white p-6 sm:p-8 rounded-xl shadow-2xl border border-indigo-100 mb-6">
-            
-            {/* Main Instruction Heading */}
-            <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 mb-3 leading-snug">
-                સમાજ ડિરેક્ટરી અપડેટ
-            </h2>
 
-            <p className="text-base text-gray-700 mb-4 border-l-4 border-indigo-500 pl-3">
-                સમાજની ડિરેક્ટરીને **સાચી અને અપડેટેડ** રાખવું દરેક સભ્યની જવાબદારી છે. આપના સહયોગ અને સક્રિય ભાગીદારી બદલ આભાર.
-            </p>
+  {/* --- Native Section --- */}
+  <div className="mb-6">
 
-            <div className="bg-indigo-50/50 p-4 rounded-lg border border-indigo-200">
-                <p className="font-semibold text-base text-indigo-700 mb-2">
-                    📢 મહત્વપૂર્ણ સૂચના:
-                </p>
-                <p className="text-sm text-gray-700 mb-2">
-                    પ્રથમ તબક્કામાં, આપણે ટેલિફોન/મોબાઇલ ડિરેક્ટરી બનાવી રહ્યા છીએ.
-                    <br/>
-                    કૃપા કરીને તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
-                </p>
-              { /* <p className="text-sm font-bold text-indigo-800 mt-3">
-                    આપના પરિવારનો ડેટા અપડેટ કરવા માટે જમણી બાજુના નીચેના ખૂણામાં **'Family'** બટન પર ક્લિક કરો.
-                </p>
-*/}               
+    {/* Main Heading */}
+    <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 mb-3 leading-snug">
+      સમાજ ડિરેક્ટરી અપડેટ
+    </h2>
 
-            </div>
-            <>
-             <p className="text-m font-bold text-indigo-800 mt-3">
-  
-  <Link
-    to="/voice"
-    className="text-blue-600 underline hover:text-blue-800 transition"
-  >
-    'Click here to Add/Update your family '
-  </Link>{" "}
-  
-</p>
-            </>
+    <p className="text-base text-gray-700 mb-4 border-l-4 border-indigo-500 pl-3">
+      સમાજની ડિરેક્ટરીને **સાચી અને અપડેટેડ** રાખવું દરેક સભ્યની જવાબદારી છે.
+      આપના સહયોગ અને સક્રિય ભાગીદારી બદલ આભાર.
+    </p>
 
-        </div>
+    {/* Light info box (still native-looking) */}
+    <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
+      <p className="font-semibold text-base text-indigo-700 mb-2">
+        📢 મહત્વપૂર્ણ સૂચના:
+      </p>
 
-        {/* --- Team Directory / Main App Component --- */}
-        <div className="mt-6">
-            <TeamDirectory />
-        </div>
-      </main>
+      <p className="text-sm text-gray-700 mb-2">
+        પ્રથમ તબક્કામાં, આપણે ટેલિફોન/મોબાઇલ ડિરેક્ટરી બનાવી રહ્યા છીએ.
+        <br />
+        કૃપા કરીને તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
+      </p>
+    </div>
+
+    <p className="text-m font-bold text-indigo-800 mt-4">
+      <Link
+        to="/voice"
+        className="text-blue-600 underline hover:text-blue-800 transition"
+      >
+        Click here to Add/Update your family
+      </Link>
+    </p>
+  </div>
+
+  {/* --- Team Directory Component --- */}
+  <div className="mt-1">
+    <TeamDirectory />
+  </div>
+</main>
+
       
       {/* Footer / Navigation (Assuming it's a separate component like bottom navigation) */}
       {/* If this were a full application, a fixed bottom navigation would go here. */}
