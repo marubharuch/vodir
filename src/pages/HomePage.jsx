@@ -2,40 +2,63 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../context/ProfileContext";
-import TeamDirectory from "./TeamDirectory";
-import CityRibbon from "../components/CityRibbon";
-import { Link } from "react-router-dom";
-// Removed unused imports: CombinedForm, Carousel, CardList, images, cards
+import { Link, useNavigate } from "react-router-dom";
+import localforage from "localforage";
 
-// We can define a simple icon for the Logout button
-const LogOutIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5 ml-1"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-    strokeWidth={2}
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H5a3 3 0 01-3-3v-5a3 3 0 013-3h3"
-    />
-  </svg>
-);
+import CityRibbon from "../components/CityRibbon";
+import TeamDirectory from "./TeamDirectory";
+import DirectoryNoticeModal from "../components/DirectoryNoticeModal";
 
 const HomePage = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { profile } = useProfile();
+  const navigate = useNavigate();
+
   const [loading, setLoading] = useState(true);
-console.log("home page v-1")
+  const [showPopup, setShowPopup] = useState(false);
+
+  /* --------------------------------------------------------
+     1️⃣ Stop showing "loading" as soon as user is available
+  -------------------------------------------------------- */
   useEffect(() => {
     if (user !== undefined) {
       setLoading(false);
     }
   }, [user]);
 
+  /* --------------------------------------------------------
+     2️⃣ Popup Logic: Show only for NEW users
+     - Only show if user logged in
+     - Only show if NO familySrno/profile.id
+     - Only if user has NOT closed popup before
+  -------------------------------------------------------- */
+  useEffect(() => {
+    async function checkPopup() {
+      if (!user) return;
+
+      const dismissed = await localforage.getItem("noticeDismissed");
+     // if (dismissed) return; // user already dismissed popup
+
+      // show popup ONLY when profile not created
+      if (!profile?.id) {
+        setShowPopup(true);
+      }
+    }
+
+    checkPopup();
+  }, [user, profile]);
+
+  /* --------------------------------------------------------
+     3️⃣ Close popup & store dismissal
+  -------------------------------------------------------- */
+  const handleClosePopup = async () => {
+    setShowPopup(false);
+    await localforage.setItem("noticeDismissed", true);
+  };
+
+  /* --------------------------------------------------------
+     4️⃣ Show loading / login message
+  -------------------------------------------------------- */
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen text-lg text-indigo-600">
@@ -50,18 +73,23 @@ console.log("home page v-1")
       </div>
     );
 
-  const displayName = user?.displayName || user?.email?.split('@')[0] || "સભ્ય";
-  
+  const displayName =
+    user?.displayName || user?.email?.split("@")[0] || "સભ્ય";
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
 
-      {/* --- City Ribbon (Fixed at top) --- */}
+      {/* 🔥 Popup */}
+      <DirectoryNoticeModal
+        show={showPopup}
+        onClose={handleClosePopup}
+      />
+
+      {/* --- City Ribbon at top --- */}
       <CityRibbon />
 
-      {/* --- Top Header / Welcome Bar (Sticky) --- */}
+      {/* --- Header --- */}
       <header className="sticky top-0 z-10 bg-white shadow-lg p-3 sm:px-6 flex items-center justify-between border-b border-gray-200">
-        
-        {/* Welcome Greeting */}
         <div className="flex flex-col">
           <h1 className="text-xl sm:text-2xl font-bold text-indigo-700">
             👋 Welcome, {displayName}!
@@ -70,67 +98,27 @@ console.log("home page v-1")
             {user?.email}
           </p>
         </div>
+      </header>
 
-        {/* Logout Button */}
-       { /*<button
-          onClick={logout}
-          className="flex items-center bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow-md hover:bg-red-600 transition duration-150"
-          aria-label="Logout"
-        >
-          Logout
-          <LogOutIcon />
-        </button>
-*/}      </header>
-
-      {/* --- Main Content Area --- */}
+      {/* --- Page Body --- */}
       <main className="p-4 sm:p-6 flex-1">
 
-  {/* --- Native Section --- */}
-  <div className="mb-6">
+        <div className="mb-6">
+                    
+          <p className="text-m font-bold text-indigo-800 mt-4">
+            <Link
+              to="/voice"
+              className="text-blue-600 underline hover:text-blue-800 transition"
+            >
+              Click here to Add/Update your family
+            </Link>
+          </p>
+        </div>
 
-    {/* Main Heading */}
-    <h2 className="text-xl sm:text-2xl font-extrabold text-gray-800 mb-3 leading-snug">
-      સમાજ ડિરેક્ટરી અપડેટ
-    </h2>
-
-    <p className="text-base text-gray-700 mb-4 border-l-4 border-indigo-500 pl-3">
-      સમાજની ડિરેક્ટરીને **સાચી અને અપડેટેડ** રાખવું દરેક સભ્યની જવાબદારી છે.
-      આપના સહયોગ અને સક્રિય ભાગીદારી બદલ આભાર.
-    </p>
-
-    {/* Light info box (still native-looking) */}
-    <div className="bg-indigo-50 p-4 rounded-md border border-indigo-100">
-      <p className="font-semibold text-base text-indigo-700 mb-2">
-        📢 મહત્વપૂર્ણ સૂચના:
-      </p>
-
-      <p className="text-sm text-gray-700 mb-2">
-        પ્રથમ તબક્કામાં, આપણે ટેલિફોન/મોબાઇલ ડિરેક્ટરી બનાવી રહ્યા છીએ.
-        <br />
-        કૃપા કરીને તમારા પરિવારના દરેક સભ્યનું નામ અને મોબાઇલ નંબર ઉમેરો.
-      </p>
-    </div>
-
-    <p className="text-m font-bold text-indigo-800 mt-4">
-      <Link
-        to="/voice"
-        className="text-blue-600 underline hover:text-blue-800 transition"
-      >
-        Click here to Add/Update your family
-      </Link>
-    </p>
-  </div>
-
-  {/* --- Team Directory Component --- */}
-  <div className="mt-1">
-    <TeamDirectory />
-  </div>
-</main>
-
-      
-      {/* Footer / Navigation (Assuming it's a separate component like bottom navigation) */}
-      {/* If this were a full application, a fixed bottom navigation would go here. */}
-
+        <div className="mt-1">
+          <TeamDirectory />
+        </div>
+      </main>
     </div>
   );
 };

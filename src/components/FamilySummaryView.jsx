@@ -1,8 +1,6 @@
 // src/components/FamilySummaryView.jsx
-
 import React from "react";
 
-/* Remove hidden characters */
 function clean(str) {
   if (!str) return "";
   return str.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
@@ -19,41 +17,22 @@ const FamilySummaryView = ({
   if (!profile?.id || !user?.uid) return null;
 
   const uid = clean(user.uid);
-  const userEmail = clean(user.email);
 
-  console.log("📌 Profile:", profile);
-  console.log("🔑 UID:", uid);
-  console.log("✉ Email:", userEmail);
-
-  /* ----------------------------------------------------
-      Editor List (UIDs only)
-  ---------------------------------------------------- */
+  /* Editor list = UID list */
   const editorList = Array.isArray(profile.editorEmails)
     ? profile.editorEmails.map(clean)
     : [];
 
-  /* ----------------------------------------------------
-      Pending List (Emails only)
-  ---------------------------------------------------- */
+  /* Pending = array of objects */
   const pendingList = Array.isArray(profile.pendingEditorEmails)
-    ? profile.pendingEditorEmails.map(clean)
+    ? profile.pendingEditorEmails
     : [];
 
-  /* ----------------------------------------------------
-      Permissions
-  ---------------------------------------------------- */
-  const isUserEditor = editorList.includes(uid);
-  const isUserPending = pendingList.includes(userEmail);
-
-  console.log("✔ isUserEditor:", isUserEditor);
-  console.log("✔ isUserPending:", isUserPending);
-
-  const familyMembers = profile.members || members || [];
+  const isCreator = uid === clean(profile.createdBy);
+  const isUserEditor = isCreator || editorList.includes(uid);
 
   return (
     <div className="p-4 border rounded-lg shadow bg-white space-y-4">
-      
-      {/* HEADER */}
       <div className="border-b pb-2 text-gray-700">
         <p>
           <strong>ID:</strong>{" "}
@@ -65,43 +44,44 @@ const FamilySummaryView = ({
         </p>
       </div>
 
-      {/* MEMBERS */}
       <h3 className="font-bold text-indigo-700">👥 Members</h3>
 
-      {familyMembers.map((m) => (
+      {(profile.members || []).map((m) => (
         <div
           key={m.id}
-          className={`p-2 mb-1 border rounded ${
-            m.pending ? "bg-yellow-100" : "bg-gray-50"
-          }`}
+          className="p-2 mb-1 border rounded bg-gray-50"
         >
           <strong>{m.name}</strong> ({m.countryCode} {m.mobile})
         </div>
       ))}
 
-      {/* PENDING EDITOR REQUESTS */}
+      {/* Pending requests */}
       {isUserEditor && pendingList.length > 0 && (
-        <div className="mt-4 p-3 border rounded bg-blue-50">
+        <div className="p-3 border rounded bg-blue-50">
           <h3 className="font-bold text-blue-700 mb-2">
             ⏳ Pending Editor Requests
           </h3>
 
-          {pendingList.map((email) => (
+          {pendingList.map((req) => (
             <div
-              key={email}
+              key={req.uid}
               className="flex justify-between items-center p-2 bg-white border rounded mb-2"
             >
               <button
-                onClick={() => handleEditorApproval(email, false)}
+                onClick={() => handleEditorApproval(req.uid, false)}
                 className="bg-red-600 text-white px-3 py-1 rounded"
               >
                 Reject
               </button>
 
-              <span className="flex-1 text-center text-gray-700">{email}</span>
+              <span className="flex-1 text-center text-gray-700">
+                <b>{req.name || "New User"}</b> <br />
+                {req.email} <br />
+                {req.mobile}
+              </span>
 
               <button
-                onClick={() => handleEditorApproval(email, true)}
+                onClick={() => handleEditorApproval(req.uid, true)}
                 className="bg-green-600 text-white px-3 py-1 rounded"
               >
                 Approve
@@ -111,18 +91,12 @@ const FamilySummaryView = ({
         </div>
       )}
 
-      {/* MODIFY BUTTON */}
-      {isUserEditor && (
+      {(isUserEditor || isCreator) && (
         <button
           onClick={enterEditMode}
-          disabled={isUserPending || loading}
-          className={`mt-4 w-full rounded-lg py-2 font-semibold text-white ${
-            isUserPending
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-yellow-600 hover:bg-yellow-700"
-          }`}
+          className="w-full rounded-lg py-2 font-semibold text-white bg-yellow-600 hover:bg-yellow-700"
         >
-          {isUserPending ? "⏳ Waiting for Approval" : "✏️ Modify Family Data"}
+          ✏️ Modify Family Data
         </button>
       )}
     </div>

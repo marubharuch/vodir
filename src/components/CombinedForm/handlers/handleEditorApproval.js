@@ -5,7 +5,7 @@ import { db } from "../../../firebase";
 import localforage from "localforage";
 
 export async function handleEditorApproval(
-  email,
+  targetUid,
   approve,
   profile,
   updateProfile,
@@ -23,130 +23,97 @@ export async function handleEditorApproval(
 
     const approverUid = user.uid;
 
-    // 1️⃣ Check permission (editorEmails contains UIDs)
+    /* Permission Check */
     const isEditor =
       Array.isArray(profile.editorEmails) &&
       profile.editorEmails.includes(approverUid);
-
     if (!isEditor) {
       setWarning("⚠️ તમને મંજૂરી / રદ કરવાની પરવાનગી નથી.");
       return;
     }
 
-    if (!window.confirm(`${approve ? "Approve" : "Reject"} ${email}?`)) return;
-
-    const emailKey = email.replace(/\./g, "_");
     const familyRef = ref(db, `families/${profile.id}`);
     const snap = await get(familyRef);
-
     if (!snap.exists()) {
       setWarning("⚠️ Family not found in database.");
       return;
     }
 
     const data = snap.val();
-    const editors = data.editorEmails || {};  // UID keys
-    const pending = data.pendingEditorEmails || {}; // email_key keys
+    const editors = data.editorEmails || {};
+    const pending = data.pendingEditorEmails || {};
 
+    /* Load user info */
+    const usersSnap = await get(ref(db, "users"));
+    const allUsers = usersSnap.val() || {};
+    const userData = allUsers[targetUid];
 
-    /* --------------------------------------------------------------------
-       2️⃣ Find UID of this email (MUST WORK TO APPROVE CORRECT USER)
-    -------------------------------------------------------------------- */
-    const usersRef = ref(db, "users");
-    const allUsers = (await get(usersRef)).val() || {};
-
-    let targetUid = null;
-
-    // find which UID belongs to this email
-    Object.keys(allUsers).forEach((uid) => {
-      if (allUsers[uid].email === email) {
-        targetUid = uid;
-      }
-    });
-
-    if (!targetUid) {
-      setWarning("⚠️ User not found for this email.");
-      delete pending[emailKey]; // clean inconsistent entry
+    if (!userData) {
+      setWarning("⚠ User data not found.");
       return;
     }
 
+    /* Confirm */
+    if (
+      !window.confirm(
+        `${approve ? "Approve" : "Reject"} ${userData.email} (${userData.name})?`
+      )
+    )
+      return;
+
+    if (!pending[targetUid]) {
+      setWarning("⚠ No pending request for this user.");
+      return;
+    }
 
     let successMsg = "";
 
-
-    /* --------------------------------------------------------------------
-       3️⃣ APPROVE
-    -------------------------------------------------------------------- */
+    /* APPROVE */
     if (approve) {
-      // Add UID as editor
       editors[targetUid] = true;
+      delete pending[targetUid];
 
-      // Remove from pending
-      delete pending[emailKey];
-
-      // Link user to family
       await update(ref(db, `users/${targetUid}`), {
         familySrno: profile.id,
       });
 
-      successMsg = `✅ ${email} approved as editor.`;
+      successMsg = `✅ ${userData.email} approved.`;
     }
-
-
-    /* --------------------------------------------------------------------
-       4️⃣ REJECT
-    -------------------------------------------------------------------- */
+    /* REJECT */
     else {
-      delete pending[emailKey];
+      delete pending[targetUid];
 
-      // Unlink only if they previously linked themselves before approval
       await update(ref(db, `users/${targetUid}`), {
         familySrno: null,
       });
 
-      successMsg = `❌ ${email} rejected.`;
+      successMsg = `❌ ${userData.email} rejected.`;
     }
 
-
-    /* --------------------------------------------------------------------
-       5️⃣ SAVE BACK TO RTDB
-    -------------------------------------------------------------------- */
+    /* Save */
     await update(familyRef, {
       editorEmails: editors,
       pendingEditorEmails: pending,
       updatedAt: Date.now(),
     });
 
-
-    /* --------------------------------------------------------------------
-       6️⃣ NORMALIZE FOR UI
-           editorEmails → UID array
-           pending → real emails array
-    -------------------------------------------------------------------- */
-    const normalizedEditors = Object.keys(editors); // ONLY UIDs
-    const normalizedPending = Object.keys(pending).map((k) =>
-      k.replace(/_/g, ".")
-    );
-
-
-    const updatedProfile = {
+    /* Update UI profile */
+    const newProfile = {
       ...profile,
-      editorEmails: normalizedEditors,
-      pendingEditorEmails: normalizedPending,
+      editorEmails: Object.keys(editors),
+      pendingEditorEmails: Object.keys(pending).map(
+        (uid) => allUsers[uid]?.email || uid
+      ),
       updatedAt: Date.now(),
     };
 
-
-    // Update Local Cache
-    await localforage.setItem(`profileData_${user.uid}`, updatedProfile);
-
-    // Update React Context
-    updateProfile(updatedProfile);
+    await localforage.setItem(`profileData_${user.uid}`, newProfile);
+    updateProfile(newProfile);
 
     setWarning(successMsg);
   } catch (err) {
     console.error("Approval error:", err);
-    setWarning("⚠️ Approval update failed.");
+    setWarning("⚠ Approval update failed.");
   } finally {
     setLoading(false);
   }

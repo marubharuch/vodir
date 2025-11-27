@@ -1,4 +1,4 @@
-// 🔥 UID-Based Final Version
+// src/components/CombinedForm/handlers/handleFinish.js
 import { ref, runTransaction, set, update, get } from "firebase/database";
 import { db } from "../../../firebase";
 import localforage from "localforage";
@@ -10,11 +10,9 @@ export async function handleFinish({
   updateProfile,
   members,
   formData,
-  setMembers,
   setWarning,
   setLoading,
 }) {
-  // Basic checks
   if (!user?.uid) {
     setWarning("❌ User UID missing. Please login again.");
     return;
@@ -29,70 +27,51 @@ export async function handleFinish({
   setWarning("");
 
   try {
-    const uid = user.uid;                         // ⭐ REAL KEY
-    const userRef = ref(db, `users/${uid}`);      // ⭐ FIXED
+    const uid = user.uid;
     const familySrnoRef = ref(db, `users/${uid}/familySrno`);
     const masterIndexRef = ref(db, "master/familyIndex");
 
+    let familyId = profile?.id;
     let successMessage = "";
-    let familyIdToSave = profile?.id;
-    let finalFamilyPayload = {};
+    let fullFamilyData = {};
+    const now = Date.now();
 
-    // -------------------------------------------------------
-    // 🆕 CREATE NEW FAMILY
-    // -------------------------------------------------------
-    if (!profile?.id) {
-      console.log("🆕 Creating new family using UID key…");
-
-      // 1. Generate next family ID
+    /* -------------------------------------------------------
+       CREATE NEW FAMILY
+    -------------------------------------------------------- */
+    if (!familyId) {
       const txn = await runTransaction(masterIndexRef, (data) => {
         let next = data?.nextSrno || 1;
         return { nextSrno: next + 1 };
       });
 
       const newSrno = txn.snapshot.val().nextSrno - 1;
-      familyIdToSave = newSrno.toString();
+      familyId = newSrno.toString();
 
-      const now = Date.now();
-
-      // 2. Build new family object
-      finalFamilyPayload = {
+      fullFamilyData = {
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         members,
-        createdBy: uid,            // ⭐ FIXED - UID, not email
+        createdBy: uid,
         createdAt: now,
-        editorEmails: { [uid]: true },   // ⭐ FIXED
-        pendingEditorEmails: {},
+        editorEmails: { [uid]: true }, // creator auto-editor
+        pendingEditorEmails: {}, // UID-based
         updatedAt: now,
         lastUpdateTimestamp: now,
       };
 
-      // 3. Save full family node
-      await set(ref(db, `families/${familyIdToSave}`), finalFamilyPayload);
-
-      // 4. Link family to user
-      await set(familySrnoRef, familyIdToSave);
-
-      // 5. Summary node
-      await set(ref(db, `familyDetails/${familyIdToSave}`), {
-        lastUpdateTimestamp: now,
-        nativeCity: formData.nativeCity,
-        currentCity: formData.currentCity,
-        totalMembers: members.length,
-      });
-
-      successMessage = `🎉 New family created! SRNO: ${familyIdToSave}`;
+      await set(ref(db, `families/${familyId}`), fullFamilyData);
+      await set(familySrnoRef, familyId);
     }
 
-    // -------------------------------------------------------
-    // ✏️ UPDATE EXISTING FAMILY
-    // -------------------------------------------------------
+    /* -------------------------------------------------------
+       UPDATE EXISTING FAMILY
+    -------------------------------------------------------- */
     else {
       await handleUpdateFamily(
-        familyIdToSave,
+        familyId,
         members,
-        uid,                        // ⭐ FIXED
+        uid,
         profile,
         formData,
         familySrnoRef,
@@ -100,32 +79,55 @@ export async function handleFinish({
         (msg) => (successMessage = msg),
         setLoading
       );
+
+      const snap = await get(ref(db, `families/${familyId}`));
+      fullFamilyData = snap.val();
     }
 
-    // -------------------------------------------------------
-    // 💾 UPDATE LOCAL CACHE + PROFILE CONTEXT
-    // -------------------------------------------------------
-    const now = Date.now();
+    /* -------------------------------------------------------
+       LOAD ALL USERS (needed for UID → email conversion)
+    -------------------------------------------------------- */
+    const usersSnap = await get(ref(db, "users"));
+    const allUsers = usersSnap.val() || {};
 
-    const savedData = {
-      id: familyIdToSave,
-      members,
-      nativeCity: formData.nativeCity,
-      currentCity: formData.currentCity,
-      updatedAt: now,
-      lastUpdateTimestamp: now,
-      createdAt: profile?.createdAt || now,
-      editorEmails: { ...(profile?.editorEmails || {}), [uid]: true },
-      ...finalFamilyPayload,
-      ...profile,
+    /* -------------------------------------------------------
+       BUILD CLEAN PROFILE FOR UI
+    -------------------------------------------------------- */
+    const cleanProfile = {
+      id: familyId,
+      nativeCity: fullFamilyData.nativeCity,
+      currentCity: fullFamilyData.currentCity,
+
+      members: Object.keys(fullFamilyData.members || {}).map((id) => ({
+        id,
+        ...fullFamilyData.members[id],
+      })),
+
+      createdAt: fullFamilyData.createdAt,
+      createdBy: fullFamilyData.createdBy,
+      updatedAt: fullFamilyData.updatedAt,
+      lastUpdateTimestamp: fullFamilyData.lastUpdateTimestamp,
+
+      editorEmails: Object.keys(fullFamilyData.editorEmails || {}),
+
+      pendingEditorEmails: Object.keys(fullFamilyData.pendingEditorEmails || {}).map(
+        (pendingUid) => ({
+          uid: pendingUid,
+          email: allUsers[pendingUid]?.email || "unknown",
+          name: allUsers[pendingUid]?.name || "",
+          mobile: allUsers[pendingUid]?.mobile || "",
+        })
+      ),
     };
 
-    // Save to profile context
-    await updateProfile(savedData);
+    /* -------------------------------------------------------
+       SAVE TO CACHE + CONTEXT
+    -------------------------------------------------------- */
+    await updateProfile(cleanProfile);
+    await localforage.setItem(`profileData_${uid}`, cleanProfile);
 
-    // Save to LocalForage (UID KEY - ⭐ FIXED)
-    await localforage.setItem(`profileData_${uid}`, savedData);
-
+    console.log("📦 FINAL PROFILE SAVED:", cleanProfile);
+    if (!successMessage) successMessage = "✔ Family updated!";
     alert(successMessage);
   } catch (err) {
     console.error("❌ Save Error:", err);

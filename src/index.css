@@ -1,15 +1,17 @@
-/* src/index.css */
 @import "tailwindcss";
 
+/* 🔥 Fade + Slide Animations */
 @theme {
-  --animation-marquee: marquee 15s linear infinite;
+  --animate-fadeIn: fadeIn .35s ease-out both;
+  --animate-slideUp: slideUp .35s ease-out both;
 }
 
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

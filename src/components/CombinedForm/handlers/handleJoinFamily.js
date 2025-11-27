@@ -9,7 +9,9 @@ export async function handleJoinFamily(
   user,
   setShowJoinPopup,
   setWarning,
-  setLoading
+  setLoading,
+  profile,
+  updateProfile
 ) {
   setLoading(true);
   setWarning("");
@@ -21,64 +23,63 @@ export async function handleJoinFamily(
     }
 
     const uid = user.uid;
-    const safeEmailKey = user.email.replace(/\./g, "_");
 
-    /* -----------------------------------------
-       1️⃣ Load family
-    ------------------------------------------*/
+    /* 1️⃣ Load family */
     const familyRef = ref(db, `families/${srno}`);
     const snap = await get(familyRef);
-
     if (!snap.exists()) {
       setWarning(`❌ SRNO ${srno} માટે કોઈ ફેમિલી મળી નથી.`);
       return;
     }
-
     const data = snap.val();
 
-    /* -----------------------------------------
-       2️⃣ Check existing pending request (email-based)
-    ------------------------------------------*/
+    /* 2️⃣ Check existing pending */
     const pending = data.pendingEditorEmails || {};
-
-    if (pending[safeEmailKey]) {
+    if (pending[uid]) {
       setWarning("⚠️ તમારી રિક્વેસ્ટ પહેલેથી જ પેન્ડિંગ છે.");
       return;
     }
 
-    /* -----------------------------------------
-       3️⃣ Match member by mobile
-    ------------------------------------------*/
-    const membersObj = data.members || {};
-    const memberArray = Object.keys(membersObj).map((id) => ({
-      id,
-      ...membersObj[id],
-    }));
-
-    const matched = memberArray.find(
+    /* 3️⃣ Match by mobile */
+    const members = data.members || {};
+    const matched = Object.values(members).find(
       (m) => m.mobile?.toString() === mobile.toString()
     );
-
     if (!matched) {
       setWarning("❌ મોબાઈલ નંબર ફેમિલીમાં મળ્યો નથી.");
       return;
     }
 
-    /* -----------------------------------------
-       4️⃣ Add pending request (EMAIL KEY)
-    ------------------------------------------*/
-    pending[safeEmailKey] = true;
-
+    /* 4️⃣ Add pending UID */
+    pending[uid] = true;
     await update(familyRef, {
       pendingEditorEmails: pending,
       updatedAt: Date.now(),
     });
 
-    /* -----------------------------------------
-       5️⃣ ❗ DO NOT SET familySrno YET
-       User will get familySrno ONLY after approval
-    ------------------------------------------*/
+    /* 5️⃣ REFRESH DATA FOR UI */
+    const updatedSnap = await get(familyRef);
+    const updatedData = updatedSnap.val();
 
+    const usersSnap = await get(ref(db, "users"));
+    const allUsers = usersSnap.val() || {};
+
+    const pendingList = Object.keys(updatedData.pendingEditorEmails || {}).map(
+      (pendingUid) => ({
+        uid: pendingUid,
+        email: allUsers[pendingUid]?.email || "unknown",
+        name: allUsers[pendingUid]?.name || "",
+        mobile: allUsers[pendingUid]?.mobile || "",
+      })
+    );
+
+    /* 6️⃣ Update context */
+    updateProfile({
+      ...profile,
+      pendingEditorEmails: pendingList,
+    });
+
+    /* 7️⃣ Notify */
     setWarning("✅ તમારી રિક્વેસ્ટ એડમિનને મોકલાઈ ગઈ!");
     setShowJoinPopup(false);
   } catch (err) {

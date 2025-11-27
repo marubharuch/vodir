@@ -4,36 +4,40 @@ import { useNavigate } from "react-router-dom";
 import {
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
 } from "firebase/auth";
 
-import { ref, get, set } from "firebase/database";   // ⭐ RTDB IMPORT
-import { auth } from "../firebase";
-import { db } from "../firebase";                    // ⭐ RTDB instance
+import { ref, get, set } from "firebase/database";
+import { auth, db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import localforage from "localforage";
+import LoginRecoverModal from "../components/LoginRecoverModal";
 
 const LoginPage = () => {
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
-  const [email, setEmail]       = useState("");
+  const [showRecoverModal, setShowRecoverModal] = useState(false);
+
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName]         = useState("");
-  const [mobile, setMobile]     = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [name, setName] = useState("");
+  const [mobile, setMobile] = useState("");
+
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  /* -----------------------------------------------------
-     ⭐ 1. Google Sign-In Handler
-  ----------------------------------------------------- */
+  /* -----------------------------------
+     ⭐ Google Login
+  ----------------------------------- */
   const handleGoogleAuth = async () => {
-    const provider = new GoogleAuthProvider();
     try {
       setLoading(true);
+
+      const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
@@ -41,32 +45,25 @@ const LoginPage = () => {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName || "",
-        phoneNumber: firebaseUser.phoneNumber || "",
+        phoneNumber: firebaseUser.phoneNumber || ""
       };
 
-      // ⭐ Save locally
       await localforage.setItem("authUser", userData);
       await login(userData);
-
-      // ⭐ Ensure user exists in RTDB
-      await ensureUserInRTDB(userData);
+      await ensureUserInRTDB(userData, "google");
 
       navigate("/");
     } catch (err) {
       console.error("Google Login Error:", err);
-      try {
-        await signInWithRedirect(auth, provider);
-      } catch (redirectErr) {
-        console.error("Google Redirect failed:", redirectErr);
-      }
+      alert("Google login failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  /* -----------------------------------------------------
-     ⭐ 2. Email/Password Login or Register
-  ----------------------------------------------------- */
+  /* -----------------------------------
+     ⭐ Email Login / Register
+  ----------------------------------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -86,29 +83,38 @@ const LoginPage = () => {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         displayName: firebaseUser.displayName || name,
-        phoneNumber: firebaseUser.phoneNumber || mobile,
+        phoneNumber: firebaseUser.phoneNumber || mobile
       };
 
-      // ⭐ Save locally
       await localforage.setItem("authUser", userData);
       await login(userData);
-
-      // ⭐ Create / Update user's RTDB entry
-      await ensureUserInRTDB(userData);
+      await ensureUserInRTDB(userData, "password");
 
       navigate("/");
     } catch (err) {
-      console.error("Auth Error:", err);
       alert(err.message);
     } finally {
       setLoading(false);
     }
   };
+const handleForgotPassword = async () => {
+  if (!email) {
+    alert("Enter your email first.");
+    return;
+  }
 
-  /* -----------------------------------------------------
-     ⭐ 3. Create missing /users/<uid> entry in RTDB
-  ----------------------------------------------------- */
-  const ensureUserInRTDB = async (userData) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+    alert("Password reset email sent.");
+  } catch (error) {
+    alert(error.message);
+  }
+};
+
+  /* -----------------------------------
+     ⭐ Ensure user exists in RTDB
+  ----------------------------------- */
+  const ensureUserInRTDB = async (userData, provider) => {
     const userRef = ref(db, `users/${userData.uid}`);
     const snap = await get(userRef);
 
@@ -117,125 +123,164 @@ const LoginPage = () => {
         email: userData.email,
         name: userData.displayName || "",
         mobile: userData.phoneNumber || "",
-        familySrno: null,        // ⭐ IMPORTANT
-        role: "newUser",         // helps your app identify new users
+        familySrno: null,
+        role: "newUser",
+        provider
       });
-      console.log("👤 User created in RTDB:", userData.uid);
-    } else {
-      console.log("👤 User already exists in RTDB.");
     }
   };
 
-  /* -----------------------------------------------------
-     ⭐ 4. Forgot Password
-  ----------------------------------------------------- */
-  const handleForgotPassword = async () => {
-    if (!email) return alert("Enter your email first.");
-    try {
-      await sendPasswordResetEmail(auth, email);
-      alert("Password reset email sent.");
-    } catch (err) {
-      alert(err.message);
+  /* -----------------------------------
+     ⭐ Recovered account selection
+  ----------------------------------- */
+  const handleRecoveredUserSelect = async (user) => {
+    setShowRecoverModal(false);
+
+    // Auto-login if Google provider
+    if (user.provider === "google") {
+      alert(
+        `✔ Account found.\nThis account uses Google Login.\nAutomatically logging in…`
+      );
+      handleGoogleAuth();
+      return;
     }
+
+    // Email/password → only auto-fill email
+    setShowEmailForm(true);
+    setEmail(user.email);
+
+    alert(
+      `✔ Account found!\nYour email is filled.\nPlease enter your password to login.`
+    );
   };
 
-  /* -----------------------------------------------------
-     ⭐ 5. UI Rendering
-  ----------------------------------------------------- */
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-4">
-      <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          {isRegister ? "Create Account" : "Welcome Back"}
-        </h2>
+    <>
+      <LoginRecoverModal
+        show={showRecoverModal}
+        onClose={() => setShowRecoverModal(false)}
+        onSelectUser={handleRecoveredUserSelect}
+      />
 
-        {/* Google Auth button */}
-        <button
-          onClick={handleGoogleAuth}
-          disabled={loading}
-          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg mb-4 transition"
-        >
-          {loading ? "Please wait…" : "Continue with Google"}
-        </button>
+      <div className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-blue-100 to-purple-100">
+        <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md">
+          <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
+            {isRegister ? "Create Account" : "Welcome Back"}
+          </h2>
 
-        <div className="flex items-center my-4">
-          <hr className="flex-1 border-gray-300" />
-          <span className="px-2 text-sm text-gray-500">OR</span>
-          <hr className="flex-1 border-gray-300" />
-        </div>
-
-        {/* Email/Password form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {isRegister && (
+          {/* Google Login */}
+          {!showEmailForm && (
             <>
-              <input
-                type="text"
-                placeholder="Full Name"
-                className="w-full border p-2 rounded"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
+              <button
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition mb-4"
+              >
+                Continue with Google
+              </button>
 
-              <input
-                type="tel"
-                placeholder="Mobile Number"
-                className="w-full border p-2 rounded"
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                required
-              />
+              <button
+                onClick={() => setShowEmailForm(true)}
+                className="w-full bg-gray-700 text-white py-2 rounded-lg"
+              >
+                Use email / password
+              </button>
+
+              <p
+                onClick={() => setShowRecoverModal(true)}
+                className="mt-3 text-center text-blue-600 underline cursor-pointer"
+              >
+                Forgot Email / Login Details?
+              </p>
             </>
           )}
 
-          <input
-            type="email"
-            placeholder="Email Address"
-            className="w-full border p-2 rounded"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
+          {/* Email Login */}
+          {showEmailForm && (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {isRegister && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      className="w-full border p-2 rounded"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                    <input
+                      type="text"
+                      placeholder="Mobile"
+                      className="w-full border p-2 rounded"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      required
+                    />
+                  </>
+                )}
 
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full border p-2 rounded"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
+                <input
+                  type="email"
+                  placeholder="Email Address"
+                  className="w-full border p-2 rounded"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
-          >
-            {isRegister ? "Register" : "Login"}
-          </button>
-        </form>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  className="w-full border p-2 rounded"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
 
-        {!isRegister && (
-          <button
-            onClick={handleForgotPassword}
-            className="text-sm text-blue-500 mt-3 hover:underline"
-          >
-            Forgot Password?
-          </button>
-        )}
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-semibold"
+                >
+                  {isRegister ? "Register" : "Login"}
+                </button>
+              </form>
 
-        <p className="mt-6 text-center text-gray-600">
-          {isRegister ? "Already have an account?" : "Don’t have an account?"}{" "}
-          <button
-            onClick={() => setIsRegister(!isRegister)}
-            className="text-blue-600 font-semibold hover:underline"
-          >
-            {isRegister ? "Login here" : "Register here"}
-          </button>
-        </p>
+              <p
+                onClick={handleForgotPassword}
+                className="text-sm text-blue-600 mt-2 underline cursor-pointer"
+              >
+                Forgot Password?
+              </p>
+
+              <p className="mt-6 text-center">
+                {isRegister ? "Already registered?" : "New user?"}{" "}
+                <span
+                  onClick={() => setIsRegister(!isRegister)}
+                  className="text-blue-600 underline cursor-pointer"
+                >
+                  {isRegister ? "Login here" : "Register here"}
+                </span>
+              </p>
+
+              <button
+                onClick={() => setShowEmailForm(false)}
+                className="mt-4 w-full text-gray-500 underline"
+              >
+                Back to Google Login
+              </button>
+
+              <p
+                onClick={() => setShowRecoverModal(true)}
+                className="mt-3 text-center text-blue-600 underline cursor-pointer"
+              >
+                Forgot Email / Login Details?
+              </p>
+            </>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
