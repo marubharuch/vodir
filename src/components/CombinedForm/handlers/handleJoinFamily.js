@@ -1,4 +1,5 @@
-// 🔥 RTDB + Safe Email Version (Fully Corrected)
+// src/components/CombinedForm/handlers/handleJoinFamily.js
+
 import { ref, get, update } from "firebase/database";
 import { db } from "../../../firebase";
 
@@ -14,65 +15,75 @@ export async function handleJoinFamily(
   setWarning("");
 
   try {
-    const rawEmail = user.email;
-    const safeEmail = rawEmail.replace(/\./g, "_");
+    if (!user?.uid || !user?.email) {
+      setWarning("❌ User not logged in. Please login again.");
+      return;
+    }
 
+    const uid = user.uid;
+    const safeEmailKey = user.email.replace(/\./g, "_");
+
+    /* -----------------------------------------
+       1️⃣ Load family
+    ------------------------------------------*/
     const familyRef = ref(db, `families/${srno}`);
-    const familySnap = await get(familyRef);
+    const snap = await get(familyRef);
 
-    if (!familySnap.exists()) {
+    if (!snap.exists()) {
       setWarning(`❌ SRNO ${srno} માટે કોઈ ફેમિલી મળી નથી.`);
       return;
     }
 
-    const familyData = familySnap.val();
+    const data = snap.val();
 
-    // Check existing pending request
-    const pendingMap = familyData.pendingEditorEmails || {};
-    if (pendingMap[safeEmail]) {
-      setWarning("⚠️ તમારી એડિટર રિક્વેસ્ટ પહેલેથી જ પેન્ડિંગ છે.");
+    /* -----------------------------------------
+       2️⃣ Check existing pending request (email-based)
+    ------------------------------------------*/
+    const pending = data.pendingEditorEmails || {};
+
+    if (pending[safeEmailKey]) {
+      setWarning("⚠️ તમારી રિક્વેસ્ટ પહેલેથી જ પેન્ડિંગ છે.");
       return;
     }
 
-    // Convert members object -> array (FIXED)
-    const membersObj = familyData.members || {};
+    /* -----------------------------------------
+       3️⃣ Match member by mobile
+    ------------------------------------------*/
+    const membersObj = data.members || {};
     const memberArray = Object.keys(membersObj).map((id) => ({
       id,
       ...membersObj[id],
     }));
 
-    // Match mobile inside members (FIXED)
     const matched = memberArray.find(
       (m) => m.mobile?.toString() === mobile.toString()
     );
 
     if (!matched) {
-      setWarning("❌ દાખલ કરેલો મોબાઈલ નંબર આ ફેમિલીમાં મળ્યો નથી.");
+      setWarning("❌ મોબાઈલ નંબર ફેમિલીમાં મળ્યો નથી.");
       return;
     }
 
-    // Add pending editor request
-    const updatedPending = {
-      ...pendingMap,
-      [safeEmail]: true,
-    };
+    /* -----------------------------------------
+       4️⃣ Add pending request (EMAIL KEY)
+    ------------------------------------------*/
+    pending[safeEmailKey] = true;
 
     await update(familyRef, {
-      pendingEditorEmails: updatedPending,
+      pendingEditorEmails: pending,
       updatedAt: Date.now(),
     });
 
-    // FIXED: Link UID, not email
-    await update(ref(db, `users/${user.uid}`), {
-      familySrno: srno.toString(),
-    });
+    /* -----------------------------------------
+       5️⃣ ❗ DO NOT SET familySrno YET
+       User will get familySrno ONLY after approval
+    ------------------------------------------*/
 
-    setWarning("✅ તમારી રિક્વેસ્ટ મોકલાઈ ગઈ!");
+    setWarning("✅ તમારી રિક્વેસ્ટ એડમિનને મોકલાઈ ગઈ!");
     setShowJoinPopup(false);
-
   } catch (err) {
     console.error("Join Family Error:", err);
-    setWarning("⚠️ Family join દરમ્યાન ભૂલ થઈ.");
+    setWarning("⚠️ Family join દરમિયાન ભૂલ થઈ.");
   } finally {
     setLoading(false);
   }

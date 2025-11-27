@@ -1,98 +1,133 @@
-// 🚀 Corrected RTDB-ONLY VERSION
 // src/utils/loadFamilyProfile.js
 
 import safeLocalForage from "../utils/safeLocalForage";
 import { ref, get } from "firebase/database";
 import { db } from "../firebase";
 
-// 👉 Normalize RTDB data to UI-friendly format
-function normalizeFamilyData(data) {
+/* -------------------------------------------------------------------
+   Remove hidden unicode characters + trim
+------------------------------------------------------------------- */
+function clean(str) {
+  if (!str) return "";
+  return str.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
+
+/* -------------------------------------------------------------------
+   Detect UID vs email_key
+------------------------------------------------------------------- */
+function isUID(key) {
+  return key.length >= 20 && !key.includes("@");
+}
+
+/* -------------------------------------------------------------------
+   Convert "email_com" → "email.com"
+------------------------------------------------------------------- */
+function emailKeyToEmail(key) {
+  return clean(key).replace(/_/g, ".");
+}
+
+/* -------------------------------------------------------------------
+   Normalize editorEmails or pendingEditorEmails
+   editorEmails → UIDs
+   pendingEditorEmails → emails
+------------------------------------------------------------------- */
+function normalizeMap(obj) {
+  if (!obj || typeof obj !== "object") return [];
+
+  return Object.keys(obj).map((key) => {
+    const cleaned = clean(key);
+    return isUID(cleaned) ? cleaned : emailKeyToEmail(cleaned);
+  });
+}
+
+/* -------------------------------------------------------------------
+   Normalize full family
+------------------------------------------------------------------- */
+function normalizeFamily(data) {
+  if (!data) return {};
+
   const normalized = { ...data };
 
-  // Normalize editorEmails (object -> array)
-  if (normalized.editorEmails && typeof normalized.editorEmails === "object") {
-    normalized.editorEmails = Object.keys(normalized.editorEmails).map((k) =>
-      k.replace(/_/g, ".")
-    );
-  }
+  normalized.editorEmails = normalizeMap(data.editorEmails); // UID list
+  normalized.pendingEditorEmails = normalizeMap(data.pendingEditorEmails); // Email list
 
-  // Normalize pendingEditorEmails (object -> array)
-  if (
-    normalized.pendingEditorEmails &&
-    typeof normalized.pendingEditorEmails === "object"
-  ) {
-    normalized.pendingEditorEmails = Object.keys(
-      normalized.pendingEditorEmails
-    ).map((k) => k.replace(/_/g, "."));
-  }
-
-  // Normalize members (object -> array)
-  if (
-    normalized.members &&
-    !Array.isArray(normalized.members) &&
-    typeof normalized.members === "object"
-  ) {
-    normalized.members = Object.keys(normalized.members)
-      .map((key) => ({ id: key, ...normalized.members[key] }))
+  if (data.members && typeof data.members === "object") {
+    normalized.members = Object.keys(data.members)
+      .map((id) => ({
+        id,
+        ...data.members[id],
+      }))
       .sort((a, b) => Number(a.id) - Number(b.id));
+  } else {
+    normalized.members = [];
   }
 
   return normalized;
 }
 
-/**
- * Loads family profile for a logged-in user
- */
+/* -------------------------------------------------------------------
+   Main Loader: UID based, cached + sanitized
+------------------------------------------------------------------- */
 export async function loadFamilyProfile(user, updateProfile) {
   if (!user?.uid) return null;
 
-  console.log("load family profile (RTDB)");
+  const uid = clean(user.uid);
+  const cacheKey = `profileData_${uid}`;
 
-  const cacheKey = `profileData_${user.uid}`;
-  console.log("🔑 LocalForage Key:", cacheKey);
+  console.log("🚀 loadFamilyProfile start uid=", uid);
 
-  // 1️⃣ Load from LocalForage
+  /* 1️⃣ Load from cache */
   const cached = await safeLocalForage.getItem(cacheKey);
-  console.log("📦 LocalForage Cached Data:", JSON.stringify(cached, null, 2));
+  const cachedUpdatedAt = cached?.updatedAt || 0;
 
-  if (cached) {
-    const normalizedCache = normalizeFamilyData(cached);
-    console.log("📦 Normalized Cache:", JSON.stringify(normalizedCache, null, 2));
+  console.log("📦 Cached profile:", cached);
 
-    updateProfile(normalizedCache);
-    return normalizedCache;
-  }
-
-  // 2️⃣ Load familySrno from RTDB
-
-  const userKey = user.email.replace(/\./g, "_");
-const srnoSnap = await get(ref(db, `users/${userKey}/familySrno`));                                                 
-  console.log("🔥 RTDB familySrno snapshot:", srnoSnap.val());
-
-  if (!srnoSnap.exists()) return null;
-
+  /* 2️⃣ Get familySrno using UID mapping */
+  const srnoSnap = await get(ref(db, `users/${uid}/familySrno`));
   const familySrno = srnoSnap.val();
 
-  // 3️⃣ Load full family data from RTDB
+  if (!srnoSnap.exists() || !familySrno) {
+    console.warn("⚠ No familySrno found for user:", uid);
+    return null;
+  }
+
+  /* 3️⃣ Read updatedAt */
+  const updatedAtSnap = await get(ref(db, `families/${familySrno}/updatedAt`));
+  const serverUpdatedAt = updatedAtSnap.val() || 0;
+
+  /* 4️⃣ Use cache if no change */
+  if (cached && cachedUpdatedAt === serverUpdatedAt) {
+    console.log("✔ Using cached family profile");
+    updateProfile(cached);
+    return cached;
+  }
+
+  /* 5️⃣ Fetch full family */
   const familySnap = await get(ref(db, `families/${familySrno}`));
-  console.log("🔥 RTDB family data raw:", JSON.stringify(familySnap.val(), null, 2));
 
-  if (!familySnap.exists()) return null;
+  if (!familySnap.exists()) {
+    console.warn("⚠ Family not found:", familySrno);
+    return null;
+  }
 
-  const familyData = familySnap.val();
+  const raw = familySnap.val();
 
-  // Normalize
-  const newProfileData = {
+  /* 6️⃣ Normalize + sanitize */
+  const normalized = normalizeFamily(raw);
+
+  const finalProfile = {
     id: familySrno,
-    ...normalizeFamilyData(familyData),
+    updatedAt: raw.updatedAt || Date.now(),
+    ...normalized,
   };
 
-  console.log("🔥 RTDB normalized data:", JSON.stringify(newProfileData, null, 2));
+  console.log("🔥 Final normalized family:", finalProfile);
 
-  // Save to LocalForage
-  await safeLocalForage.setItem(cacheKey, newProfileData);
-  console.log("💾 Saved to LocalForage");
+  /* 7️⃣ Save to local cache */
+  await safeLocalForage.setItem(cacheKey, finalProfile);
 
-  updateProfile(newProfileData);
-  return newProfileData;
+  /* 8️⃣ Update React context */
+  updateProfile(finalProfile);
+
+  return finalProfile;
 }

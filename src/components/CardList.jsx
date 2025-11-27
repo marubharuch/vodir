@@ -3,6 +3,7 @@ import React from 'react';
 import { FaSearch } from 'react-icons/fa';
 
 const CardList = ({ cards }) => {
+  console.log("cardlist.jsx")
   return (
     <div className="mt-6 px-4 space-y-4 flex-1">
       {cards.map(card => (

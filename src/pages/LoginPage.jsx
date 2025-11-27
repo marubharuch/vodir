@@ -8,89 +8,80 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-} from "firebase/auth"; 
+} from "firebase/auth";
+
+import { ref, get, set } from "firebase/database";   // ⭐ RTDB IMPORT
 import { auth } from "../firebase";
+import { db } from "../firebase";                    // ⭐ RTDB instance
 import { useAuth } from "../context/AuthContext";
 import localforage from "localforage";
 
-// Summary: This component handles user authentication, allowing users to log in or register
-// using either a Google account or an email/password combination. It manages
-// form states, interacts with Firebase for authentication, and stores user data
-// locally using localforage.
-
 const LoginPage = () => {
-  // State variables to manage form inputs and UI state
-  const [isRegister, setIsRegister] = useState(false); // Determines if the user is registering or logging in
-  const [email, setEmail] = useState("");
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [mobile, setMobile] = useState("");
-  const [loading, setLoading] = useState(false); // Manages button loading state
+  const [name, setName]         = useState("");
+  const [mobile, setMobile]     = useState("");
+  const [loading, setLoading]   = useState(false);
 
-  // Hooks for navigation and authentication context
   const navigate = useNavigate();
-  const { login } = useAuth(); // Custom hook to access the global login function
+  const { login } = useAuth();
 
-  // 👉 Google Auth: Handles sign-in with a Google account
+  /* -----------------------------------------------------
+     ⭐ 1. Google Sign-In Handler
+  ----------------------------------------------------- */
   const handleGoogleAuth = async () => {
     const provider = new GoogleAuthProvider();
     try {
       setLoading(true);
-      // Attempt to sign in using a popup window
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
 
-      // Create a clean user object to store
       const userData = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: firebaseUser.displayName,
-        phoneNumber: firebaseUser.phoneNumber,
+        displayName: firebaseUser.displayName || "",
+        phoneNumber: firebaseUser.phoneNumber || "",
       };
 
-      // Store user data locally and update the global auth state
+      // ⭐ Save locally
       await localforage.setItem("authUser", userData);
       await login(userData);
-      const storedAuthUser = await localforage.getItem("authUser");
-      console.log("LocalForage 'authUser' after Email Login:", storedAuthUser);
-      // 💡 Also check for the profile key (though it might be null/pending)
-      const profileKey = `profileData_${userData.uid}`;
-      const storedProfile = await localforage.getItem(profileKey);
-      console.log(`LocalForage Profile Data (${profileKey}):`, storedProfile);
 
-      //alert(`Welcome ${userData.displayName || userData.email}! 🎉 Login successful`);
-      navigate("/"); // Navigate to the home page on success
+      // ⭐ Ensure user exists in RTDB
+      await ensureUserInRTDB(userData);
+
+      navigate("/");
     } catch (err) {
-      console.warn("Popup blocked, trying redirect…", err);
-      // Fallback to a full-page redirect if the popup is blocked
+      console.error("Google Login Error:", err);
       try {
         await signInWithRedirect(auth, provider);
       } catch (redirectErr) {
-        console.error("Google redirect failed:", redirectErr);
+        console.error("Google Redirect failed:", redirectErr);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // 👉 Email/Password Auth: Handles sign-in or registration with email and password
+  /* -----------------------------------------------------
+     ⭐ 2. Email/Password Login or Register
+  ----------------------------------------------------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       let firebaseUser;
+
       if (isRegister) {
-        // Create a new user account if isRegister is true
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        firebaseUser = userCredential.user;
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        firebaseUser = res.user;
       } else {
-        // Sign in an existing user
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        firebaseUser = userCredential.user;
+        const res = await signInWithEmailAndPassword(auth, email, password);
+        firebaseUser = res.user;
       }
 
-      // Create a clean user object for storage
       const userData = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
@@ -98,26 +89,48 @@ const LoginPage = () => {
         phoneNumber: firebaseUser.phoneNumber || mobile,
       };
 
-      // Store user data and update global auth state
+      // ⭐ Save locally
       await localforage.setItem("authUser", userData);
       await login(userData);
 
-     // alert(`Welcome ${userData.displayName || userData.email}! 🎉`);
-      navigate("/"); // Navigate to the home page
+      // ⭐ Create / Update user's RTDB entry
+      await ensureUserInRTDB(userData);
+
+      navigate("/");
     } catch (err) {
+      console.error("Auth Error:", err);
       alert(err.message);
-      console.error("Auth error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 👉 Forgot Password: Sends a password reset email
-  const handleForgotPassword = async () => {
-    if (!email) {
-      alert("Enter your email first.");
-      return;
+  /* -----------------------------------------------------
+     ⭐ 3. Create missing /users/<uid> entry in RTDB
+  ----------------------------------------------------- */
+  const ensureUserInRTDB = async (userData) => {
+    const userRef = ref(db, `users/${userData.uid}`);
+    const snap = await get(userRef);
+
+    if (!snap.exists()) {
+      await set(userRef, {
+        email: userData.email,
+        name: userData.displayName || "",
+        mobile: userData.phoneNumber || "",
+        familySrno: null,        // ⭐ IMPORTANT
+        role: "newUser",         // helps your app identify new users
+      });
+      console.log("👤 User created in RTDB:", userData.uid);
+    } else {
+      console.log("👤 User already exists in RTDB.");
     }
+  };
+
+  /* -----------------------------------------------------
+     ⭐ 4. Forgot Password
+  ----------------------------------------------------- */
+  const handleForgotPassword = async () => {
+    if (!email) return alert("Enter your email first.");
     try {
       await sendPasswordResetEmail(auth, email);
       alert("Password reset email sent.");
@@ -126,7 +139,9 @@ const LoginPage = () => {
     }
   };
 
-  // JSX for the login/registration form UI
+  /* -----------------------------------------------------
+     ⭐ 5. UI Rendering
+  ----------------------------------------------------- */
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-4">
       <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
@@ -134,13 +149,13 @@ const LoginPage = () => {
           {isRegister ? "Create Account" : "Welcome Back"}
         </h2>
 
-        {/* Google Login button */}
+        {/* Google Auth button */}
         <button
           onClick={handleGoogleAuth}
-          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg shadow-md mb-4 transition"
-          disabled={loading} // Disable button while loading
+          disabled={loading}
+          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 rounded-lg mb-4 transition"
         >
-          {loading ? "Please wait..." : "Continue with Google"}
+          {loading ? "Please wait…" : "Continue with Google"}
         </button>
 
         <div className="flex items-center my-4">
@@ -149,65 +164,58 @@ const LoginPage = () => {
           <hr className="flex-1 border-gray-300" />
         </div>
 
-        {/* Email/Password Form */}
+        {/* Email/Password form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Conditionally render name and mobile fields for registration */}
+          
           {isRegister && (
             <>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
-                  required
-                />
-              </div>
-              <div>
-                <input
-                  type="tel"
-                  placeholder="Mobile Number"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
-                  required
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Full Name"
+                className="w-full border p-2 rounded"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+
+              <input
+                type="tel"
+                placeholder="Mobile Number"
+                className="w-full border p-2 rounded"
+                value={mobile}
+                onChange={(e) => setMobile(e.target.value)}
+                required
+              />
             </>
           )}
 
-          <div>
-            <input
-              type="email"
-              placeholder="Email Address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
-              required
-            />
-          </div>
-          <div>
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border p-2 rounded focus:ring focus:ring-blue-300"
-              required
-            />
-          </div>
+          <input
+            type="email"
+            placeholder="Email Address"
+            className="w-full border p-2 rounded"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            className="w-full border p-2 rounded"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg shadow-md transition"
-            disabled={loading} // Disable button while loading
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
           >
             {isRegister ? "Register" : "Login"}
           </button>
         </form>
 
-        {/* Forgot Password button, only visible on the login form */}
         {!isRegister && (
           <button
             onClick={handleForgotPassword}
@@ -217,7 +225,6 @@ const LoginPage = () => {
           </button>
         )}
 
-        {/* Toggle between login and registration forms */}
         <p className="mt-6 text-center text-gray-600">
           {isRegister ? "Already have an account?" : "Don’t have an account?"}{" "}
           <button

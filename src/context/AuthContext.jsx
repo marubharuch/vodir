@@ -11,63 +11,54 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🚀 QUICK LOAD FIX: Single useEffect to handle both local cache and Firebase sync
   useEffect(() => {
-    
-    // 1. LocalForage se user data load karna (Fastest check, Promise-based)
+
+    // 1️⃣ Load cached user immediately (fast UI)
     localforage.getItem("authUser")
-      .then((storedUser) => {
-        if (storedUser) {
-          // Turant user state restore karo (ProfileContext jaldi trigger hoga)
-          setUser(storedUser);
-          // Note: setLoading ko abhi false nahi karna, kyunki Firebase sync pending hai
+      .then((cachedUser) => {
+        if (cachedUser) {
+          setUser(cachedUser);
         }
       })
-      .catch((err) => {
-        console.error("Auth load error:", err);
-      })
+      .catch((err) => console.error("Auth load error:", err))
       .finally(() => {
-        
-        // 2. Firebase Auth state change ke liye listener set karna
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-          
-          // Local state (jo abhi localforage se loaded ho sakta hai) ko Firebase se sync karein
+
+        // 2️⃣ Attach Firebase listener
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+
           if (firebaseUser) {
-            const finalUser = 
-              (user && user.uid === firebaseUser.uid) ? user : { // Local state ko prefer karo agar woh already set hua hai
-                uid: firebaseUser.uid,
-                email: firebaseUser.email,
-                displayName: firebaseUser.displayName,
+            // Always use clean Firebase user object
+            const freshUser = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName || "",
+              phoneNumber: firebaseUser.phoneNumber || "",
             };
-            setUser(finalUser);
+
+            setUser(freshUser);
+            await localforage.setItem("authUser", freshUser);
           } else {
-            // Logged out. State clear karo.
             setUser(null);
-            localforage.removeItem("authUser");
+            await localforage.removeItem("authUser");
           }
-          
-          // CRITICAL: Loading state sirf yahan ek baar band hogi (jab Firebase sync ho jaaye)
+
           setLoading(false);
         });
 
-        return unsubscribe; // Cleanup function
+        return unsubscribe;
       });
-      
-  }, []); 
 
-  // Login → state + localforage me user save karo
+  }, []);
+
+  // Manual login (if you use custom flow)
   const login = async (userData) => {
     setUser(userData);
     await localforage.setItem("authUser", userData);
   };
 
-  // Logout → state + localforage clear karo
   const logout = async () => {
     setUser(null);
     await localforage.removeItem("authUser");
-    await localforage.removeItem(userCacheKey);
-//    await localforage.clear();
-    // Firebase se bhi sign out karna zaruri hai
     await auth.signOut();
   };
 
@@ -75,7 +66,6 @@ export function AuthProvider({ children }) {
     return <div className="text-center p-4">Loading...</div>;
   }
 
-  // NOTE: You need to include the 'logout' function in the provider's value if you use it in other components
   return (
     <AuthContext.Provider value={{ user, login, logout, loading }}>
       {children}
@@ -83,7 +73,7 @@ export function AuthProvider({ children }) {
   );
 }
 
-// Custom hook for using auth state
+// Custom hook
 export function useAuth() {
   return useContext(AuthContext);
 }

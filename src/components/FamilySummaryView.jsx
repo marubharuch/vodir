@@ -1,4 +1,12 @@
+// src/components/FamilySummaryView.jsx
+
 import React from "react";
+
+/* Remove hidden characters */
+function clean(str) {
+  if (!str) return "";
+  return str.replace(/[\u200B-\u200D\uFEFF]/g, "").trim();
+}
 
 const FamilySummaryView = ({
   user,
@@ -6,33 +14,58 @@ const FamilySummaryView = ({
   members,
   loading,
   enterEditMode,
-  isUserNonPendingEditor,
-  isUserPending,
   handleEditorApproval,
 }) => {
-  if (!profile?.id) return null;
-console.log("profile",profile)
+  if (!profile?.id || !user?.uid) return null;
+
+  const uid = clean(user.uid);
+  const userEmail = clean(user.email);
+
+  console.log("📌 Profile:", profile);
+  console.log("🔑 UID:", uid);
+  console.log("✉ Email:", userEmail);
+
+  /* ----------------------------------------------------
+      Editor List (UIDs only)
+  ---------------------------------------------------- */
+  const editorList = Array.isArray(profile.editorEmails)
+    ? profile.editorEmails.map(clean)
+    : [];
+
+  /* ----------------------------------------------------
+      Pending List (Emails only)
+  ---------------------------------------------------- */
+  const pendingList = Array.isArray(profile.pendingEditorEmails)
+    ? profile.pendingEditorEmails.map(clean)
+    : [];
+
+  /* ----------------------------------------------------
+      Permissions
+  ---------------------------------------------------- */
+  const isUserEditor = editorList.includes(uid);
+  const isUserPending = pendingList.includes(userEmail);
+
+  console.log("✔ isUserEditor:", isUserEditor);
+  console.log("✔ isUserPending:", isUserPending);
+
   const familyMembers = profile.members || members || [];
 
   return (
     <div className="p-4 border rounded-lg shadow bg-white space-y-4">
-
-      {/* ========================= */}
-      {/* FAMILY HEADER             */}
-      {/* ========================= */}
+      
+      {/* HEADER */}
       <div className="border-b pb-2 text-gray-700">
         <p>
           <strong>ID:</strong>{" "}
           <span className="text-red-600 font-bold">{profile.id}</span>
         </p>
+
         <p>
           <strong>City:</strong> {profile.currentCity} ({profile.nativeCity})
         </p>
       </div>
 
-      {/* ========================= */}
-      {/* MEMBERS LIST              */}
-      {/* ========================= */}
+      {/* MEMBERS */}
       <h3 className="font-bold text-indigo-700">👥 Members</h3>
 
       {familyMembers.map((m) => (
@@ -43,58 +76,51 @@ console.log("profile",profile)
           }`}
         >
           <strong>{m.name}</strong> ({m.countryCode} {m.mobile})
-          {m.pending && (
-            <span className="ml-2 text-xs text-red-600">⏳ Pending</span>
-          )}
         </div>
       ))}
 
-      {/* ========================= */}
-      {/* PENDING EDITOR REQUESTS   */}
-      {/* ========================= */}
-      {isUserNonPendingEditor &&
-        Array.isArray(profile.pendingEditorEmails) &&
-        profile.pendingEditorEmails.length > 0 && (
-          <div className="mt-4 p-3 border rounded bg-blue-50">
-            <h3 className="font-bold text-blue-700 mb-2">
-              ⏳ Pending Editor Requests
-            </h3>
+      {/* PENDING EDITOR REQUESTS */}
+      {isUserEditor && pendingList.length > 0 && (
+        <div className="mt-4 p-3 border rounded bg-blue-50">
+          <h3 className="font-bold text-blue-700 mb-2">
+            ⏳ Pending Editor Requests
+          </h3>
 
-            {profile.pendingEditorEmails.map((email) => (
-              <div
-                key={email}
-                className="flex justify-between items-center p-2 bg-white border rounded mb-2"
+          {pendingList.map((email) => (
+            <div
+              key={email}
+              className="flex justify-between items-center p-2 bg-white border rounded mb-2"
+            >
+              <button
+                onClick={() => handleEditorApproval(email, false)}
+                className="bg-red-600 text-white px-3 py-1 rounded"
               >
-                <button
-                  onClick={() => handleEditorApproval(email, false)}
-                  className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-                >
-                  Reject
-                </button>
+                Reject
+              </button>
 
-                <span className="flex-1 text-center text-gray-700">
-                  {email}
-                </span>
+              <span className="flex-1 text-center text-gray-700">{email}</span>
 
-                <button
-                  onClick={() => handleEditorApproval(email, true)}
-                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
-                >
-                  Approve
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+              <button
+                onClick={() => handleEditorApproval(email, true)}
+                className="bg-green-600 text-white px-3 py-1 rounded"
+              >
+                Approve
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* ========================= */}
-      {/* MODIFY BUTTON             */}
-      {/* ========================= */}
-      {(isUserNonPendingEditor || isUserPending) && (
+      {/* MODIFY BUTTON */}
+      {isUserEditor && (
         <button
           onClick={enterEditMode}
-          disabled={loading || isUserPending}
-          className="mt-4 w-full bg-yellow-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-yellow-700 transition"
+          disabled={isUserPending || loading}
+          className={`mt-4 w-full rounded-lg py-2 font-semibold text-white ${
+            isUserPending
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-yellow-600 hover:bg-yellow-700"
+          }`}
         >
           {isUserPending ? "⏳ Waiting for Approval" : "✏️ Modify Family Data"}
         </button>

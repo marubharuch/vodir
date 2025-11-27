@@ -1,4 +1,4 @@
-// 🔥 FINAL SIMPLIFIED RTDB Version (Object Arguments)
+// 🔥 UID-Based Final Version
 import { ref, runTransaction, set, update, get } from "firebase/database";
 import { db } from "../../../firebase";
 import localforage from "localforage";
@@ -14,31 +14,14 @@ export async function handleFinish({
   setWarning,
   setLoading,
 }) {
-  console.log("🔍 handleFinish args:", {
-    profile,
-    user,
-    members,
-    formData,
-    hasSetWarning: typeof setWarning === "function",
-    hasSetLoading: typeof setLoading === "function",
-  });
+  // Basic checks
+  if (!user?.uid) {
+    setWarning("❌ User UID missing. Please login again.");
+    return;
+  }
 
-  // -------------------------------------------------------
-  // BASIC VALIDATION
-  // -------------------------------------------------------
   if (!user?.email) {
-    setWarning("❌ યુઝરનો ઇમેલ મળતો નથી. ફરીથી લોગિન કરો.");
-    return;
-  }
-
-  if (typeof setWarning !== "function") {
-    console.error("❌ setWarning is missing!");
-    return;
-  }
-
-  if (typeof setLoading !== "function") {
-    console.error("❌ setLoading is missing!");
-    setWarning("⚠️ Internal error: loading handler missing.");
+    setWarning("❌ User email missing. Please login again.");
     return;
   }
 
@@ -46,10 +29,9 @@ export async function handleFinish({
   setWarning("");
 
   try {
-    console.log("handleFinish (RTDB)");
-
-    const safeEmail = user.email.replace(/\./g, "_");
-    const userIndexRef = ref(db, `users/${safeEmail}/familySrno`);
+    const uid = user.uid;                         // ⭐ REAL KEY
+    const userRef = ref(db, `users/${uid}`);      // ⭐ FIXED
+    const familySrnoRef = ref(db, `users/${uid}/familySrno`);
     const masterIndexRef = ref(db, "master/familyIndex");
 
     let successMessage = "";
@@ -57,61 +39,63 @@ export async function handleFinish({
     let finalFamilyPayload = {};
 
     // -------------------------------------------------------
-    // CREATE MODE
+    // 🆕 CREATE NEW FAMILY
     // -------------------------------------------------------
     if (!profile?.id) {
-      console.log("🆕 Creating new family...");
+      console.log("🆕 Creating new family using UID key…");
 
-      const result = await runTransaction(masterIndexRef, (data) => {
+      // 1. Generate next family ID
+      const txn = await runTransaction(masterIndexRef, (data) => {
         let next = data?.nextSrno || 1;
         return { nextSrno: next + 1 };
       });
 
-      const newSrno = result.snapshot.val().nextSrno - 1;
+      const newSrno = txn.snapshot.val().nextSrno - 1;
       familyIdToSave = newSrno.toString();
 
+      const now = Date.now();
+
+      // 2. Build new family object
       finalFamilyPayload = {
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         members,
-        createdBy: safeEmail,
-        createdAt: Date.now(),
-        editorEmails: { [safeEmail]: true },
+        createdBy: uid,            // ⭐ FIXED - UID, not email
+        createdAt: now,
+        editorEmails: { [uid]: true },   // ⭐ FIXED
         pendingEditorEmails: {},
-        updatedAt: Date.now(),
-        lastUpdateTimestamp: Date.now(),
+        updatedAt: now,
+        lastUpdateTimestamp: now,
       };
 
-      // Save full family
+      // 3. Save full family node
       await set(ref(db, `families/${familyIdToSave}`), finalFamilyPayload);
 
-      // Link user
-      await set(userIndexRef, familyIdToSave);
+      // 4. Link family to user
+      await set(familySrnoRef, familyIdToSave);
 
-      // Summary table
+      // 5. Summary node
       await set(ref(db, `familyDetails/${familyIdToSave}`), {
-        lastUpdateTimestamp: Date.now(),
+        lastUpdateTimestamp: now,
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         totalMembers: members.length,
       });
 
-      successMessage = `✅ નવું ફેમિલી બનાવાયું! SRNO: ${familyIdToSave}`;
+      successMessage = `🎉 New family created! SRNO: ${familyIdToSave}`;
     }
 
     // -------------------------------------------------------
-    // UPDATE MODE
+    // ✏️ UPDATE EXISTING FAMILY
     // -------------------------------------------------------
     else {
-      console.log("📝 Updating existing family...");
-
       await handleUpdateFamily(
         familyIdToSave,
         members,
-        safeEmail,
+        uid,                        // ⭐ FIXED
         profile,
         formData,
-        userIndexRef,
+        familySrnoRef,
         null,
         (msg) => (successMessage = msg),
         setLoading
@@ -119,25 +103,28 @@ export async function handleFinish({
     }
 
     // -------------------------------------------------------
-    // UPDATE LOCAL CACHE
+    // 💾 UPDATE LOCAL CACHE + PROFILE CONTEXT
     // -------------------------------------------------------
     const now = Date.now();
 
     const savedData = {
       id: familyIdToSave,
-      ...finalFamilyPayload,
-      ...profile, // keep existing keys
       members,
       nativeCity: formData.nativeCity,
       currentCity: formData.currentCity,
       updatedAt: now,
       lastUpdateTimestamp: now,
       createdAt: profile?.createdAt || now,
+      editorEmails: { ...(profile?.editorEmails || {}), [uid]: true },
+      ...finalFamilyPayload,
+      ...profile,
     };
 
+    // Save to profile context
     await updateProfile(savedData);
 
-    await localforage.setItem(`profileData_${safeEmail}`, savedData);
+    // Save to LocalForage (UID KEY - ⭐ FIXED)
+    await localforage.setItem(`profileData_${uid}`, savedData);
 
     alert(successMessage);
   } catch (err) {
