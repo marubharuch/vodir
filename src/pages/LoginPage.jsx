@@ -15,6 +15,16 @@ import { useAuth } from "../context/AuthContext";
 import localforage from "localforage";
 import LoginRecoverModal from "../components/LoginRecoverModal";
 
+<style>
+  {`
+    .loader {
+      border: 4px solid #e5e7eb;
+      border-top-color: #2563eb;
+    }
+  `}
+</style>
+
+
 const LoginPage = () => {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
@@ -156,6 +166,17 @@ const handleForgotPassword = async () => {
 
   return (
     <>
+
+    {/* 🔥 Global Loading Overlay */}
+{loading && (
+  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+    <div className="bg-white px-6 py-4 rounded-xl shadow-lg flex flex-col items-center">
+      <div className="loader border-t-4 border-blue-600 rounded-full w-10 h-10 animate-spin mb-3"></div>
+      <p className="text-gray-700 font-medium">Processing…</p>
+    </div>
+  </div>
+)}
+
       <LoginRecoverModal
         show={showRecoverModal}
         onClose={() => setShowRecoverModal(false)}
@@ -177,7 +198,7 @@ const handleForgotPassword = async () => {
             className="w-full bg-green-900 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition mb-4"
 
               >
-                Login/Registration  with Google
+               Use Google for Login/Registration  
               </button>
 
               <button
