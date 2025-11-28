@@ -174,14 +174,15 @@ const handleForgotPassword = async () => {
               <button
                 onClick={handleGoogleAuth}
                 disabled={loading}
-                className="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-semibold transition mb-4"
+            className="w-full bg-green-900 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition mb-4"
+
               >
-                Continue with Google
+                Login/Registration  with Google
               </button>
 
               <button
                 onClick={() => setShowEmailForm(true)}
-                className="w-full bg-gray-700 text-white py-2 rounded-lg"
+                className="w-full bg-blue-900  hover:bg-blue-700 text-white py-2 rounded-lg"
               >
                 Use email / password
               </button>

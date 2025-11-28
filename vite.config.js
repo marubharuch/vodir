@@ -1,19 +1,50 @@
+import fs from 'fs';
+import path from 'path';
+
+// Auto version generator
+function generateBuildVersion() {
+  const versionFile = path.resolve('build-version.txt');
+  let buildNumber = 1;
+
+  if (fs.existsSync(versionFile)) {
+    const last = fs.readFileSync(versionFile, 'utf8');
+    buildNumber = parseInt(last) + 1;
+  }
+
+  fs.writeFileSync(versionFile, buildNumber.toString());
+
+  const now = new Date();
+  const timestamp =
+    now.getFullYear() +
+    '.' +
+    String(now.getMonth() + 1).padStart(2, '0') +
+    '.' +
+    String(now.getDate()).padStart(2, '0');
+
+  return `${timestamp}.${String(buildNumber).padStart(3, '0')}`;
+}
+
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// 🚀 FIXED & CLEAN CONFIG
 export default defineConfig({
   base: '/vodir/',
+
+  // ⭐ Correctly placed define block
+  define: {
+    __APP_VERSION__: JSON.stringify(generateBuildVersion())
+  },
+
   plugins: [
     react(),
     tailwindcss(),
+
     VitePWA({
       registerType: 'autoUpdate',
 
-      // ✔ Fresh content always
-      // ✔ Install button will work
-      // ✔ Does NOT block PWA detection
       workbox: {
         runtimeCaching: [
           {
@@ -30,16 +61,20 @@ export default defineConfig({
         ]
       },
 
-      includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
+      includeAssets: [
+        'favicon.svg',
+        'robots.txt',
+        'apple-touch-icon.png'
+      ],
 
       manifest: {
         name: 'Visha Oshwal BVPV',
         short_name: 'VO Dir',
         description: 'Visha Oshwal Dir (Borsad,Valvod,Padara,Vatadara)',
         theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         start_url: '/vodir/',
-        background_color: '#ffffff',
 
         icons: [
           {
@@ -56,4 +91,4 @@ export default defineConfig({
       }
     })
   ]
-})
+});

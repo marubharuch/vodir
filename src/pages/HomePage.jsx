@@ -78,7 +78,9 @@ const HomePage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100">
-
+<p className="text-xs text-gray-500">
+  Version: {__APP_VERSION__}
+</p>
       {/* 🔥 Popup */}
       <DirectoryNoticeModal
         show={showPopup}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { FaHome, FaSearch, FaPlusCircle, FaCommentDots } from 'react-icons/fa';
+import { FaHome, FaSearch, FaPlusCircle, FaCommentDots,FaAddressBook } from 'react-icons/fa';
 import { MdOutlineFamilyRestroom } from "react-icons/md";
 
 const BottomNav = () => {
@@ -27,14 +27,14 @@ const BottomNav = () => {
         <span className="text-xs">Admin</span>
       </Link>*/}
 
- <Link to="/boards" className="flex flex-col items-center text-blue-700 hover:text-gray-500">
+ <Link to="/voice" className="flex flex-col items-center text-blue-700 hover:text-gray-500">
        <MdOutlineFamilyRestroom size={28} />
-        <span className="text-xs">Families</span>
+        <span className="text-xs">My Family</span>
       </Link>
 
-      <Link to="/voice" className="flex flex-col items-center text-blue-700 hover:text-gray-500">
-        <FaSearch size={28} />
-        <span className="text-xs">my Family</span>
+      <Link to="/boards" className="flex flex-col items-center text-blue-700 hover:text-gray-500">
+        <FaAddressBook size={28} />
+        <span className="text-xs">Dir</span>
       </Link>
 
 

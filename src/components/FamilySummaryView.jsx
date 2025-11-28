@@ -1,5 +1,9 @@
-// src/components/FamilySummaryView.jsx
-import React from "react";
+// src/components/FamilySummaryView.jsx 
+import React, { useEffect, useState, useMemo } from "react";
+
+import { ref, get } from "firebase/database";
+import { db } from "../firebase";
+import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 
 function clean(str) {
   if (!str) return "";
@@ -18,15 +22,55 @@ const FamilySummaryView = ({
 
   const uid = clean(user.uid);
 
-  /* Editor list = UID list */
+  /* Editor list */
   const editorList = Array.isArray(profile.editorEmails)
     ? profile.editorEmails.map(clean)
     : [];
 
-  /* Pending = array of objects */
-  const pendingList = Array.isArray(profile.pendingEditorEmails)
-    ? profile.pendingEditorEmails
+  /* Pending list (UIDs only) — MUST DEFINE BEFORE useEffect */
+ const pendingList = useMemo(() => {
+  return Array.isArray(profile.pendingEditorEmails)
+    ? profile.pendingEditorEmails.map(clean)
     : [];
+}, [profile.pendingEditorEmails]);
+
+
+  /* Final array of objects with user details */
+  const [pendingUsers, setPendingUsers] = useState([]);
+
+  /* Fetch user details for pending UIDs */
+  useEffect(() => {
+    async function loadPendingUserDetails() {
+      if (!pendingList || pendingList.length === 0) {
+        setPendingUsers([]);
+        return;
+      }
+
+      const results = [];
+
+      for (const puid of pendingList) {
+        try {
+          const snap = await get(ref(db, `users/${puid}`));
+          if (snap.exists()) {
+            results.push({ uid: puid, ...snap.val() });
+          } else {
+            results.push({
+              uid: puid,
+              name: "Unknown User",
+              email: "N/A",
+              mobile: "N/A",
+            });
+          }
+        } catch (err) {
+          console.error("Error loading user", puid, err);
+        }
+      }
+
+      setPendingUsers(results);
+    }
+
+    loadPendingUserDetails();
+  }, [pendingList]);
 
   const isCreator = uid === clean(profile.createdBy);
   const isUserEditor = isCreator || editorList.includes(uid);
@@ -47,45 +91,48 @@ const FamilySummaryView = ({
       <h3 className="font-bold text-indigo-700">👥 Members</h3>
 
       {(profile.members || []).map((m) => (
-        <div
-          key={m.id}
-          className="p-2 mb-1 border rounded bg-gray-50"
-        >
+        <div key={m.id} className="p-2 mb-1 border rounded bg-gray-50">
           <strong>{m.name}</strong> ({m.countryCode} {m.mobile})
         </div>
       ))}
 
       {/* Pending requests */}
-      {isUserEditor && pendingList.length > 0 && (
-        <div className="p-3 border rounded bg-blue-50">
-          <h3 className="font-bold text-blue-700 mb-2">
+      {isUserEditor && pendingUsers.length > 0 && (
+        <div className="p-3">
+          <h3 className="font-bold text-blue-700 mb-3 text-lg">
             ⏳ Pending Editor Requests
           </h3>
 
-          {pendingList.map((req) => (
+          {pendingUsers.map((req) => (
             <div
               key={req.uid}
-              className="flex justify-between items-center p-2 bg-white border rounded mb-2"
+              className="bg-white border rounded-xl shadow p-4 mb-4 flex flex-col"
             >
-              <button
-                onClick={() => handleEditorApproval(req.uid, false)}
-                className="bg-red-600 text-white px-3 py-1 rounded"
-              >
-                Reject
-              </button>
+              {/* User Info */}
+              <div className="text-center mb-3">
+                <p className="font-semibold text-gray-900 text-base">
+                  {req.name || "New User"}
+                </p>
+                <p className="text-gray-600 text-sm">{req.email}</p>
+                <p className="text-gray-600 text-sm">{req.mobile}</p>
+              </div>
 
-              <span className="flex-1 text-center text-gray-700">
-                <b>{req.name || "New User"}</b> <br />
-                {req.email} <br />
-                {req.mobile}
-              </span>
+              {/* Action Buttons */}
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => handleEditorApproval(req.uid, false)}
+                  className="flex items-center justify-center gap-2 bg-red-600 text-white py-2 rounded-xl flex-1 font-semibold text-sm"
+                >
+                  <FaTimesCircle size={18} /> Reject
+                </button>
 
-              <button
-                onClick={() => handleEditorApproval(req.uid, true)}
-                className="bg-green-600 text-white px-3 py-1 rounded"
-              >
-                Approve
-              </button>
+                <button
+                  onClick={() => handleEditorApproval(req.uid, true)}
+                  className="flex items-center justify-center gap-2 bg-green-600 text-white py-2 rounded-xl flex-1 font-semibold text-sm"
+                >
+                  <FaCheckCircle size={18} /> Approve
+                </button>
+              </div>
             </div>
           ))}
         </div>
