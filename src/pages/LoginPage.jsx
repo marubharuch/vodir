@@ -1,18 +1,19 @@
 // src/pages/LoginPage.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   GoogleAuthProvider,
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  updateProfile
 } from "firebase/auth";
 
 import { ref, get, set } from "firebase/database";
 import { auth, db } from "../firebase";
-import { useAuth } from "../context/AuthContext";
-import localforage from "localforage";
+
 import LoginRecoverModal from "../components/LoginRecoverModal";
 
 <style>
@@ -24,43 +25,34 @@ import LoginRecoverModal from "../components/LoginRecoverModal";
   `}
 </style>
 
-
 const LoginPage = () => {
+  const navigate = useNavigate();
+
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [showRecoverModal, setShowRecoverModal] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
 
   const [loading, setLoading] = useState(false);
 
-  const navigate = useNavigate();
-  const { login } = useAuth();
-
   /* -----------------------------------
-     ⭐ Google Login
+     ⭐ Google Login (Correct for new AuthContext)
   ----------------------------------- */
   const handleGoogleAuth = async () => {
     try {
       setLoading(true);
 
       const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
-      const firebaseUser = result.user;
+      const result = await signInWithPopup(auth, provider); // Firebase login
 
-      const userData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || "",
-        phoneNumber: firebaseUser.phoneNumber || ""
-      };
+      // Firebase instantly updates AuthContext → no manual login needed
 
-      await localforage.setItem("authUser", userData);
-      await login(userData);
-      await ensureUserInRTDB(userData, "google");
+      await ensureUserInRTDB(result.user, "google");
 
       navigate("/");
     } catch (err) {
@@ -72,7 +64,7 @@ const LoginPage = () => {
   };
 
   /* -----------------------------------
-     ⭐ Email Login / Register
+     ⭐ Email Login/Register
   ----------------------------------- */
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -84,55 +76,53 @@ const LoginPage = () => {
       if (isRegister) {
         const res = await createUserWithEmailAndPassword(auth, email, password);
         firebaseUser = res.user;
+
+        // Save user display name
+        if (name) {
+          await updateProfile(firebaseUser, { displayName: name });
+        }
       } else {
         const res = await signInWithEmailAndPassword(auth, email, password);
         firebaseUser = res.user;
       }
 
-      const userData = {
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        displayName: firebaseUser.displayName || name,
-        phoneNumber: firebaseUser.phoneNumber || mobile
-      };
-
-      await localforage.setItem("authUser", userData);
-      await login(userData);
-      await ensureUserInRTDB(userData, "password");
+      await ensureUserInRTDB(firebaseUser, "password");
 
       navigate("/");
     } catch (err) {
+      console.error("Email login error:", err);
       alert(err.message);
     } finally {
       setLoading(false);
     }
   };
-const handleForgotPassword = async () => {
-  if (!email) {
-    alert("Enter your email first.");
-    return;
-  }
 
-  try {
-    await sendPasswordResetEmail(auth, email);
-    alert("Password reset email sent.");
-  } catch (error) {
-    alert(error.message);
-  }
-};
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert("Enter your email first.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      alert("Password reset email sent.");
+    } catch (error) {
+      alert(error.message);
+    }
+  };
 
   /* -----------------------------------
      ⭐ Ensure user exists in RTDB
   ----------------------------------- */
-  const ensureUserInRTDB = async (userData, provider) => {
-    const userRef = ref(db, `users/${userData.uid}`);
+  const ensureUserInRTDB = async (firebaseUser, provider) => {
+    const userRef = ref(db, `users/${firebaseUser.uid}`);
     const snap = await get(userRef);
 
     if (!snap.exists()) {
       await set(userRef, {
-        email: userData.email,
-        name: userData.displayName || "",
-        mobile: userData.phoneNumber || "",
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || "",
+        mobile: firebaseUser.phoneNumber || "",
         familySrno: null,
         role: "newUser",
         provider
@@ -141,41 +131,35 @@ const handleForgotPassword = async () => {
   };
 
   /* -----------------------------------
-     ⭐ Recovered account selection
+     ⭐ For Recover Account Popup
   ----------------------------------- */
   const handleRecoveredUserSelect = async (user) => {
     setShowRecoverModal(false);
 
-    // Auto-login if Google provider
     if (user.provider === "google") {
-      alert(
-        `✔ Account found.\nThis account uses Google Login.\nAutomatically logging in…`
-      );
+      alert("✔ Google account detected, logging you in...");
       handleGoogleAuth();
       return;
     }
 
-    // Email/password → only auto-fill email
+    // Show email login form with prefilled email
     setShowEmailForm(true);
     setEmail(user.email);
 
-    alert(
-      `✔ Account found!\nYour email is filled.\nPlease enter your password to login.`
-    );
+    alert("✔ Email filled. Enter password to continue.");
   };
 
   return (
     <>
-
-    {/* 🔥 Global Loading Overlay */}
-{loading && (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-    <div className="bg-white px-6 py-4 rounded-xl shadow-lg flex flex-col items-center">
-      <div className="loader border-t-4 border-blue-600 rounded-full w-10 h-10 animate-spin mb-3"></div>
-      <p className="text-gray-700 font-medium">Processing…</p>
-    </div>
-  </div>
-)}
+      {/* 🔥 Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white px-6 py-4 rounded-xl shadow-lg flex flex-col items-center">
+            <div className="loader border-t-4 border-blue-600 rounded-full w-10 h-10 animate-spin mb-3"></div>
+            <p className="text-gray-700 font-medium">Processing…</p>
+          </div>
+        </div>
+      )}
 
       <LoginRecoverModal
         show={showRecoverModal}
@@ -189,21 +173,20 @@ const handleForgotPassword = async () => {
             {isRegister ? "Create Account" : "Welcome Back"}
           </h2>
 
-          {/* Google Login */}
+          {/* GOOGLE LOGIN */}
           {!showEmailForm && (
             <>
               <button
                 onClick={handleGoogleAuth}
                 disabled={loading}
-            className="w-full bg-green-900 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition mb-4"
-
+                className="w-full bg-green-900 hover:bg-green-800 text-white py-3 rounded-lg font-semibold transition mb-4"
               >
-               Use Google for Login/Registration  
+                Use Google for Login/Registration
               </button>
 
               <button
                 onClick={() => setShowEmailForm(true)}
-                className="w-full bg-blue-900  hover:bg-blue-700 text-white py-2 rounded-lg"
+                className="w-full bg-blue-900 hover:bg-blue-700 text-white py-2 rounded-lg"
               >
                 Use email / password
               </button>
@@ -217,7 +200,7 @@ const handleForgotPassword = async () => {
             </>
           )}
 
-          {/* Email Login */}
+          {/* EMAIL LOGIN */}
           {showEmailForm && (
             <>
               <form onSubmit={handleSubmit} className="space-y-4">

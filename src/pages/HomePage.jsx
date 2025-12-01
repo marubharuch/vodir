@@ -37,7 +37,7 @@ const HomePage = () => {
       if (!user) return;
 
       const dismissed = await localforage.getItem("noticeDismissed");
-     // if (dismissed) return; // user already dismissed popup
+     if (dismissed) return; // user already dismissed popup
 
       // show popup ONLY when profile not created
       if (!profile?.id) {
@@ -88,7 +88,7 @@ const HomePage = () => {
       />
 
       {/* --- City Ribbon at top --- */}
-      <CityRibbon />
+    { /* <CityRibbon />*/}
 
       {/* --- Header --- */}
       <header className="sticky top-0 z-10 bg-white shadow-lg p-3 sm:px-6 flex items-center justify-between border-b border-gray-200">
@@ -108,13 +108,14 @@ const HomePage = () => {
         <div className="mb-6">
                     
           <p className="text-m font-bold text-indigo-800 mt-4">
-            <Link
-              to="/voice"
-              className="text-blue-600 underline hover:text-blue-800 transition"
-            >
-              Click here to Add/Update your family
-            </Link>
-          </p>
+  <Link
+    to="/voice"
+    className="text-red-600 underline hover:text-blue-800 transition blink-link"
+  >
+    Click here to Add/Update your family
+  </Link>
+</p>
+
         </div>
 
         <div className="mt-1">

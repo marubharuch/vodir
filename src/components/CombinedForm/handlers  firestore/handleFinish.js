@@ -68,13 +68,13 @@ export async function handleFinish(
       // LINK USER → FAMILY
       await update(userRef, { familySrno: familyId });
 
-      // Save summary for master
+      /* Save summary for master
       await set(ref(db, `familyDetails/${familyId}`), {
         nativeCity: formData.nativeCity,
         currentCity: formData.currentCity,
         totalMembers: members.length,
         lastUpdateTimestamp: Date.now(),
-      });
+      });*/
     }
 
     // ----------------------------------------
